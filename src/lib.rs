@@ -7,8 +7,8 @@
 //! # Example
 //!
 //! ```no_run
-//! use acme_micro::{Error, Certificate, Directory, DirectoryUrl};
-//! use acme_micro::create_p384_key;
+//! use acme_lite::{Error, Certificate, Directory, DirectoryUrl};
+//! use acme_lite::create_p384_key;
 //! use std::time::Duration;
 //!
 //! fn request_cert() -> Result<Certificate, Error> {

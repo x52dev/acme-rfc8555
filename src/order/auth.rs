@@ -65,8 +65,8 @@ impl Auth {
     /// The challenge will be accessed over HTTP (not HTTPS), for obvious reasons.
     ///
     /// ```no_run
-    /// use acme_micro::order::Auth;
-    /// use acme_micro::Error;
+    /// use acme_lite::order::Auth;
+    /// use acme_lite::Error;
     /// use std::fs::File;
     /// use std::io::Write;
     /// use std::time::Duration;
@@ -101,8 +101,8 @@ impl Auth {
     /// The <proof> contains the signed token proving this account update it.
     ///
     /// ```no_run
-    /// use acme_micro::order::Auth;
-    /// use acme_micro::Error;
+    /// use acme_lite::order::Auth;
+    /// use acme_lite::Error;
     /// use std::time::Duration;
     ///
     /// fn dns_authorize(auth: &Auth) -> Result<(), Error> {

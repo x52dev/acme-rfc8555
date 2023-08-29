@@ -122,7 +122,7 @@ mod test {
 
     // #[test]
     // fn test_the_whole_hog() -> Result<()> {
-    //     std::env::set_var("RUST_LOG", "acme_micro=trace");
+    //     std::env::set_var("RUST_LOG", "acme_lite=trace");
     //     let _ = env_logger::try_init();
 
     //     use crate::cert::create_p384_key;
