@@ -24,11 +24,11 @@
 //!
 //! // Generate a private key and register an account with your ACME provider.
 //! // You should write it to disk any use `load_account` afterwards.
-//! let acc = dir.register_account(contact.clone())?;
+//! let acc = dir.register_account(Some(contact.clone()))?;
 //!
 //! // Example of how to load an account from string:
 //! let privkey = acc.acme_private_key_pem()?;
-//! let acc = dir.load_account(&privkey, contact)?;
+//! let acc = dir.load_account(&privkey, Some(contact))?;
 //!
 //! // Order a new TLS certificate for a domain.
 //! let mut ord_new = acc.new_order("mydomain.io", &[])?;

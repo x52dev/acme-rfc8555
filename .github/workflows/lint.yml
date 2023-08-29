@@ -33,6 +33,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       checks: write
 
     steps:
