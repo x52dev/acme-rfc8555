@@ -17,9 +17,12 @@
 //! [`Challenge`]: struct.Challenge.html
 //! [`CsrOrder`]: struct.CsrOrder.html
 //! [`CertOrder`]: struct.CertOrder.html
+
 use std::{sync::Arc, thread, time::Duration};
 
-use openssl::pkey::{self, PKey};
+use der::Encode as _;
+use ecdsa::SigningKey;
+use pkcs8::{DecodePrivateKey as _, EncodePrivateKey as _};
 
 use crate::{
     acc::AccountInner,
@@ -202,13 +205,13 @@ impl CsrOrder {
     /// where we must poll until the status changes. The `delay` is the
     /// amount of time to wait between each poll attempt.
     ///
-    /// This is a convenience wrapper that in turn calls the lower level [`finalize_pkey`].
+    /// This is a convenience wrapper that in turn calls the lower level [`finalize_signing_key`].
     ///
-    /// [`finalize_pkey`]: struct.CsrOrder.html#method.finalize_pkey
+    /// [`finalize_signing_key`]: struct.CsrOrder.html#method.finalize_signing_key
     pub fn finalize(self, private_key_pem: &str, delay: Duration) -> Result<CertOrder> {
-        let pkey_pri = PKey::private_key_from_pem(private_key_pem.as_bytes())
-            .context("Error reading private key PEM")?;
-        self.finalize_pkey(pkey_pri, delay)
+        let signing_key =
+            SigningKey::from_pkcs8_pem(private_key_pem).context("Error reading private key PEM")?;
+        self.finalize_signing_key(signing_key, delay)
     }
 
     /// Lower level finalize call that works directly with the openssl crate structures.
@@ -218,17 +221,16 @@ impl CsrOrder {
     /// Once the CSR has been submitted, the order goes into a `processing` status,
     /// where we must poll until the status changes. The `delay` is the
     /// amount of time to wait between each poll attempt.
-    pub fn finalize_pkey(
+    pub fn finalize_signing_key(
         self,
-        private_key: PKey<pkey::Private>,
+        signing_key: p256::ecdsa::SigningKey,
         delay: Duration,
     ) -> Result<CertOrder> {
-        //
         // the domains that we have authorized
         let domains = self.order.api_order.domains();
 
         // csr from private key and authorized domains.
-        let csr = create_csr(&private_key, &domains)?;
+        let csr = create_csr(&signing_key, &domains)?;
 
         // this is not the same as PEM.
         let csr_der = csr.to_der()?;
@@ -252,7 +254,7 @@ impl CsrOrder {
             bail!("Order is in status: {:?}", order.api_order.status);
         }
 
-        Ok(CertOrder { private_key, order })
+        Ok(CertOrder { signing_key, order })
     }
 
     /// Access the underlying JSON object for debugging.
@@ -273,30 +275,28 @@ fn wait_for_order_status(inner: &Arc<AccountInner>, url: &str, delay: Duration) 
 
 /// Order for an issued certificate that is ready to download.
 pub struct CertOrder {
-    private_key: PKey<pkey::Private>,
+    signing_key: p256::ecdsa::SigningKey,
     order: Order,
 }
 
 impl CertOrder {
     /// Request download of the issued certificate.
     pub fn download_cert(self) -> Result<Certificate> {
-        //
         let url = self
             .order
             .api_order
             .certificate
             .ok_or_else(|| anyhow::anyhow!("certificate url"))?;
+
         let inner = self.order.inner;
 
         let res = inner.transport.call(&url, &ApiEmptyString)?;
 
-        // save key and cert into persistence
-        let pkey_pem_bytes = self.private_key.private_key_to_pem_pkcs8()?;
-        let pkey_pem = String::from_utf8_lossy(&pkey_pem_bytes);
+        let signing_key_pem = self.signing_key.to_pkcs8_pem(der::pem::LineEnding::LF)?;
 
         let cert = res.into_string()?;
 
-        Ok(Certificate::new(pkey_pem.to_string(), cert))
+        Ok(Certificate::new(signing_key_pem.to_string(), cert))
     }
 
     /// Access the underlying JSON object for debugging.
@@ -330,8 +330,8 @@ mod test {
         let ord = acc.new_order("acmetest.example.com", &[])?;
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
-        let pkey = cert::create_p256_key()?;
-        let _ord = ord.finalize_pkey(pkey, Duration::from_millis(1))?;
+        let signing_key = cert::create_p256_key();
+        let _ord = ord.finalize_signing_key(signing_key, Duration::from_millis(1))?;
         Ok(())
     }
 
@@ -345,8 +345,8 @@ mod test {
 
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
-        let pkey = cert::create_p256_key()?;
-        let ord = ord.finalize_pkey(pkey, Duration::from_millis(1))?;
+        let signing_key = cert::create_p256_key();
+        let ord = ord.finalize_signing_key(signing_key, Duration::from_millis(1))?;
 
         let cert = ord.download_cert()?;
         assert_eq!("CERT HERE", cert.certificate());

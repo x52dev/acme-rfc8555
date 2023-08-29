@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{acc::AcmeKey, cert::EC_GROUP_P256, util::base64url, Result};
+use crate::{acc::AcmeKey, util::base64url, Result};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub(crate) struct JwsProtected {
@@ -59,22 +59,18 @@ pub(crate) struct JwkThumb {
 impl TryFrom<&AcmeKey> for Jwk {
     type Error = crate::Error;
     fn try_from(a: &AcmeKey) -> Result<Self> {
-        let mut ctx = openssl::bn::BigNumContext::new()?;
-        let mut x = openssl::bn::BigNum::new()?;
-        let mut y = openssl::bn::BigNum::new()?;
-        a.private_key().public_key().affine_coordinates_gfp(
-            &EC_GROUP_P256,
-            &mut x,
-            &mut y,
-            &mut ctx,
-        )?;
+        let point = a.signing_key().verifying_key().to_encoded_point(false);
+
+        let x = point.x().unwrap();
+        let y = point.y().unwrap();
+
         Ok(Jwk {
             alg: "ES256".into(),
             kty: "EC".into(),
             crv: "P-256".into(),
             _use: "sig".into(),
-            x: base64url(&x.to_vec()),
-            y: base64url(&y.to_vec()),
+            x: base64url(&x),
+            y: base64url(&y),
         })
     }
 }

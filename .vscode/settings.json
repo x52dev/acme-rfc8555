@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "letsencrypt",
+        "pkix",
         "ureq"
     ]
 }

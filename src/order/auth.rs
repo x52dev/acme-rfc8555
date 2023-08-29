@@ -1,7 +1,7 @@
 //
 use std::{convert::TryInto, sync::Arc, thread, time::Duration};
 
-use openssl::sha::sha256;
+use sha2::{Digest as _, Sha256};
 
 use crate::{
     acc::{AccountInner, AcmeKey},
@@ -202,7 +202,7 @@ impl Challenge<TlsAlpn> {
     pub fn tls_alpn_proof(&self) -> Result<[u8; 32]> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
-        Ok(sha256(proof.as_bytes()))
+        Ok(Sha256::digest(proof.as_bytes()).try_into().unwrap())
     }
 }
 
@@ -263,10 +263,10 @@ fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> Result<S
     let jwk: Jwk = key.try_into()?;
     let jwk_thumb: JwkThumb = (&jwk).into();
     let jwk_json = serde_json::to_string(&jwk_thumb)?;
-    let digest = base64url(&sha256(jwk_json.as_bytes()));
+    let digest = base64url(&Sha256::digest(jwk_json.as_bytes()));
     let key_auth = format!("{}.{}", token, digest);
     let res = if extra_sha256 {
-        base64url(&sha256(key_auth.as_bytes()))
+        base64url(&Sha256::digest(key_auth.as_bytes()))
     } else {
         key_auth
     };

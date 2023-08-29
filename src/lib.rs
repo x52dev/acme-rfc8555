@@ -151,10 +151,11 @@
 //! [ACME draft spec 18](https://tools.ietf.org/html/draft-ietf-acme-acme-18), and relies
 //! heavily on the [openssl](https://docs.rs/openssl/) crate to make JWK/JWT and sign requests
 //! to the API.
-//!
 
 #[cfg(doctest)]
 doc_comment::doctest!("../README.md");
+
+extern crate pem_rfc7468 as pem;
 
 mod acc;
 mod cert;

@@ -1,5 +1,6 @@
-//
 use std::sync::Arc;
+
+use zeroize::Zeroizing;
 
 use crate::{
     api::{ApiAccount, ApiDirectory, ApiIdentifier, ApiOrder, ApiRevocation},
@@ -11,9 +12,9 @@ use crate::{
     util::{base64url, read_json},
 };
 
-mod akey;
+mod acme_key;
 
-pub(crate) use self::akey::AcmeKey;
+pub(crate) use self::acme_key::AcmeKey;
 
 #[derive(Clone, Debug)]
 pub(crate) struct AccountInner {
@@ -59,9 +60,8 @@ impl Account {
     /// Private key for this account.
     ///
     /// The key is an elliptic curve private key.
-    pub fn acme_private_key_pem(&self) -> Result<String> {
-        let pem = String::from_utf8(self.inner.transport.acme_key().to_pem()?)?;
-        Ok(pem)
+    pub fn acme_private_key_pem(&self) -> Result<Zeroizing<String>> {
+        self.inner.transport.acme_key().to_pem()
     }
 
     /// Create a new order to issue a certificate for this account.

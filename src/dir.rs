@@ -57,12 +57,12 @@ impl Directory {
     }
 
     pub fn register_account(&self, contact: Option<Vec<String>>) -> Result<Account> {
-        let acme_key = AcmeKey::new()?;
+        let acme_key = AcmeKey::new();
         self.upsert_account(acme_key, contact)
     }
 
     pub fn load_account(&self, pem: &str, contact: Option<Vec<String>>) -> Result<Account> {
-        let acme_key = AcmeKey::from_pem(pem.as_bytes())?;
+        let acme_key = AcmeKey::from_pem(pem)?;
         self.upsert_account(acme_key, contact)
     }
 
@@ -112,7 +112,7 @@ mod test {
     }
 
     #[test]
-    fn test_create_acount() -> Result<()> {
+    fn test_create_account() -> Result<()> {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::from_url(url)?;

@@ -1,77 +1,57 @@
+use anyhow::Context as _;
 use der::{
+    asn1::Ia5String,
     time::{OffsetDateTime, PrimitiveDateTime},
-    DecodePem as _,
+    DecodePem as _, Encode,
 };
-use once_cell::sync::Lazy;
-use openssl::{
-    ec::{Asn1Flag, EcGroup, EcKey},
-    hash::MessageDigest,
-    nid::Nid,
-    pkey::{self, PKey},
-    rsa::Rsa,
-    stack::Stack,
-    x509::{extension::SubjectAlternativeName, X509Req, X509ReqBuilder, X509},
+use pkcs8::{DecodePrivateKey, EncodePrivateKey};
+use x509_cert::{
+    builder::{Builder, RequestBuilder as CsrBuilder},
+    ext::pkix::{name::GeneralName, SubjectAltName},
+    name::Name,
 };
 
 use crate::error::Result;
-
-pub(crate) static EC_GROUP_P256: Lazy<EcGroup> = Lazy::new(|| ec_group(Nid::X9_62_PRIME256V1));
-pub(crate) static EC_GROUP_P384: Lazy<EcGroup> = Lazy::new(|| ec_group(Nid::SECP384R1));
-
-fn ec_group(nid: Nid) -> EcGroup {
-    let mut g = EcGroup::from_curve_name(nid).expect("EcGroup");
-    // this is required for openssl 1.0.x (but not 1.1.x)
-    g.set_asn1_flag(Asn1Flag::NAMED_CURVE);
-    g
-}
 
 /// Make an RSA private key (from which we can derive a public key).
 ///
 /// This library does not check the number of bits used to create the key pair.
 /// For Let's Encrypt, the bits must be between 2048 and 4096.
-pub fn create_rsa_key(bits: u32) -> Result<PKey<pkey::Private>> {
-    let pri_key_rsa = Rsa::generate(bits)?;
-    let pkey = PKey::from_rsa(pri_key_rsa)?;
-    Ok(pkey)
+pub fn create_rsa_key(bit_size: usize) -> Result<rsa::RsaPrivateKey> {
+    let csprng = &mut rand::thread_rng();
+    Ok(rsa::RsaPrivateKey::new(csprng, bit_size)?)
 }
 
 /// Make a P-256 private key (from which we can derive a public key).
-pub fn create_p256_key() -> Result<PKey<pkey::Private>> {
-    let pri_key_ec = EcKey::generate(&EC_GROUP_P256)?;
-    let pkey = PKey::from_ec_key(pri_key_ec)?;
-    Ok(pkey)
+pub fn create_p256_key() -> p256::ecdsa::SigningKey {
+    let csprng = &mut rand::thread_rng();
+    ecdsa::SigningKey::from(p256::SecretKey::random(csprng))
 }
 
 /// Make a P-384 private key pair (from which we can derive a public key).
-pub fn create_p384_key() -> Result<PKey<pkey::Private>> {
-    let pri_key_ec = EcKey::generate(&EC_GROUP_P384)?;
-    let pkey = PKey::from_ec_key(pri_key_ec)?;
-    Ok(pkey)
+pub fn create_p384_key() -> ecdsa::SigningKey<p384::NistP384> {
+    let csprng = &mut rand::thread_rng();
+    ecdsa::SigningKey::from(p384::SecretKey::random(csprng))
 }
 
-pub(crate) fn create_csr(pkey: &PKey<pkey::Private>, domains: &[&str]) -> Result<X509Req> {
-    // the csr builder
-    let mut req_bld = X509ReqBuilder::new()?;
+pub(crate) fn create_csr(
+    signer: &p256::ecdsa::SigningKey,
+    domains: &[&str],
+) -> Result<x509_cert::request::CertReq> {
+    let subject = "CN=localhost".parse::<Name>().unwrap();
 
-    // set private/public key in builder
-    req_bld.set_pubkey(pkey)?;
+    let mut csr = CsrBuilder::new(subject, signer).unwrap();
 
-    // set all domains as alt names
-    let mut stack = Stack::new()?;
-    let ctx = req_bld.x509v3_context(None);
-    let mut an = SubjectAlternativeName::new();
-    for d in domains {
-        an.dns(d);
-    }
-    let ext = an.build(&ctx)?;
-    stack.push(ext).expect("Stack::push");
-    req_bld.add_extensions(&stack)?;
+    csr.add_extension(&SubjectAltName(
+        domains
+            .iter()
+            .map(|domain| GeneralName::DnsName(Ia5String::new(domain).unwrap()))
+            .collect(),
+    ))
+    .unwrap();
 
-    // sign it
-    req_bld.sign(pkey, MessageDigest::sha256())?;
-
-    // the csr
-    Ok(req_bld.build())
+    csr.build::<p256::ecdsa::DerSignature>()
+        .context("build csr")
 }
 
 /// Encapsulated certificate and private key.
@@ -91,9 +71,9 @@ impl Certificate {
 
     pub fn parse(private_key: String, certificate: String) -> Result<Self> {
         // validate certificate
-        X509::from_pem(certificate.as_bytes())?;
+        x509_cert::Certificate::from_pem(certificate.as_bytes())?;
         // validate private key
-        PKey::private_key_from_pem(private_key.as_bytes())?;
+        ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&private_key)?;
 
         Ok(Certificate {
             private_key,
@@ -108,9 +88,9 @@ impl Certificate {
 
     /// The private key as DER.
     pub fn private_key_der(&self) -> Result<Vec<u8>> {
-        let pkey = PKey::private_key_from_pem(self.private_key.as_bytes())?;
-        let der = pkey.private_key_to_der()?;
-        Ok(der)
+        let signing_key = ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&self.private_key)?;
+        let der = signing_key.to_pkcs8_der()?;
+        Ok(der.as_bytes().to_vec())
     }
 
     /// The PEM encoded issued certificate.
@@ -120,9 +100,8 @@ impl Certificate {
 
     /// The issued certificate as DER.
     pub fn certificate_der(&self) -> Result<Vec<u8>> {
-        let x509 = X509::from_pem(self.certificate.as_bytes())?;
-        let der = x509.to_der()?;
-        Ok(der)
+        let x509 = x509_cert::Certificate::from_pem(&self.certificate)?;
+        x509.to_der().context("der")
     }
 
     /// Inspect the certificate to count the number of (whole) valid days left.

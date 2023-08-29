@@ -4,13 +4,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use openssl::{ecdsa::EcdsaSig, sha::sha256};
 use serde::Serialize;
+use sha2::Digest as _;
 
 use crate::{
     acc::AcmeKey,
-    error::*,
-    jwt::*,
+    error::Result,
+    jwt::{Jwk, Jws, JwsProtected},
     req::{req_expect_header, req_handle_error, req_head, req_post},
     util::base64url,
 };
@@ -184,10 +184,10 @@ fn jws_with<T: Serialize + ?Sized>(
     };
 
     let to_sign = format!("{}.{}", protected, payload);
-    let digest = sha256(to_sign.as_bytes());
-    let sig = EcdsaSig::sign(&digest, key.private_key())?;
-    let r = sig.r().to_vec();
-    let s = sig.s().to_vec();
+    let digest = sha2::Sha256::digest(to_sign.as_bytes());
+    let (sig, _rec_id) = key.signing_key().sign_recoverable(&digest).unwrap();
+    let r = sig.r().to_bytes().to_vec();
+    let s = sig.s().to_bytes().to_vec();
 
     let mut v = Vec::with_capacity(r.len() + s.len());
     v.extend_from_slice(&r);
