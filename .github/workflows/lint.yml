@@ -1,0 +1,51 @@
+name: Lint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt
+
+      - name: Format Check
+        uses: actions-rust-lang/rustfmt@v1
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+
+      - name: Clippy Check
+        uses: giraffate/clippy-action@v1
+        with:
+          reporter: github-pr-check
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          clippy_flags: --workspace --all-targets --all-features
