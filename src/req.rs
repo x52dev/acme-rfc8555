@@ -1,39 +1,43 @@
-use crate::api::ApiProblem;
-use crate::error::*;
+use std::time::Duration;
+
+use crate::{api::ApiProblem, error::*};
 
 pub(crate) type ReqResult<T> = std::result::Result<T, ApiProblem>;
 
 pub(crate) fn req_get(url: &str) -> ureq::Response {
-    let mut req = ureq::get(url);
-    req_configure(&mut req);
-    trace!("{:?}", req);
-    req.call()
+    let client = ureq_agent();
+    let req = client.get(url);
+    trace!("{req:?}");
+    req.call().unwrap()
 }
 
 pub(crate) fn req_head(url: &str) -> ureq::Response {
-    let mut req = ureq::head(url);
-    req_configure(&mut req);
-    trace!("{:?}", req);
-    req.call()
+    let client = ureq_agent();
+    let req = client.head(url);
+    trace!("{req:?}");
+    req.call().unwrap()
+}
+
+fn ureq_agent() -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(30))
+        .timeout_read(Duration::from_secs(30))
+        .timeout_write(Duration::from_secs(30))
+        .build()
 }
 
 pub(crate) fn req_post(url: &str, body: &str) -> ureq::Response {
-    let mut req = ureq::post(url);
-    req.set("content-type", "application/jose+json");
-    req_configure(&mut req);
-    trace!("{:?} {}", req, body);
-    req.send_string(body)
-}
-
-fn req_configure(req: &mut ureq::Request) {
-    req.timeout_connect(30_000);
-    req.timeout_read(30_000);
-    req.timeout_write(30_000);
+    let client = ureq_agent();
+    let req = client
+        .post(url)
+        .set("content-type", "application/jose+json");
+    trace!("{req:?} {body}");
+    req.send_string(body).unwrap()
 }
 
 pub(crate) fn req_handle_error(res: ureq::Response) -> ReqResult<ureq::Response> {
     // ok responses pass through
-    if res.ok() {
+    if (200..=299).contains(&res.status()) {
         return Ok(res);
     }
 

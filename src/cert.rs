@@ -1,4 +1,3 @@
-use crate::error::Result;
 use lazy_static::lazy_static;
 use openssl::{
     ec::{Asn1Flag, EcGroup, EcKey},
@@ -10,7 +9,7 @@ use openssl::{
     x509::{extension::SubjectAlternativeName, X509Req, X509ReqBuilder, X509},
 };
 
-use crate::error::*;
+use crate::error::{Result, *};
 
 lazy_static! {
     pub(crate) static ref EC_GROUP_P256: EcGroup = ec_group(Nid::X9_62_PRIME256V1);

@@ -17,6 +17,10 @@
 //! [`Challenge`]: struct.Challenge.html
 //! [`CsrOrder`]: struct.CsrOrder.html
 //! [`CertOrder`]: struct.CertOrder.html
+use std::{sync::Arc, thread, time::Duration};
+
+use openssl::pkey::{self, PKey};
+
 use crate::{
     acc::AccountInner,
     api::{ApiAuth, ApiEmptyString, ApiFinalize, ApiOrder},
@@ -24,8 +28,6 @@ use crate::{
     error::*,
     util::{base64url, read_json},
 };
-use openssl::pkey::{self, PKey};
-use std::{sync::Arc, thread, time::Duration};
 
 mod auth;
 

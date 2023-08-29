@@ -1,10 +1,10 @@
 #![allow(clippy::trivial_regex)]
 
+use std::{net::TcpListener, thread};
+
 use futures::Future;
 use hyper::{service::service_fn_ok, Body, Method, Request, Response, Server};
 use lazy_static::lazy_static;
-use std::net::TcpListener;
-use std::thread;
 
 lazy_static! {
     static ref RE_URL: regex::Regex = regex::Regex::new("<URL>").unwrap();
@@ -211,6 +211,6 @@ pub fn with_directory_server() -> TestServer {
 #[test]
 pub fn test_make_directory() {
     let server = with_directory_server();
-    let res = ureq::get(&server.dir_url).call();
-    assert!(res.ok());
+    let res = ureq::get(&server.dir_url).call().unwrap();
+    assert!((200..=299).contains(&res.status()));
 }

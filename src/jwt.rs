@@ -1,6 +1,8 @@
-use crate::{acc::AcmeKey, cert::EC_GROUP_P256, util::base64url, Result};
-use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
+
+use serde::{Deserialize, Serialize};
+
+use crate::{acc::AcmeKey, cert::EC_GROUP_P256, util::base64url, Result};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub(crate) struct JwsProtected {

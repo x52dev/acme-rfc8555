@@ -1,13 +1,15 @@
 //
 use std::sync::Arc;
 
-use crate::api::{ApiAccount, ApiDirectory, ApiIdentifier, ApiOrder, ApiRevocation};
-use crate::cert::Certificate;
-use crate::error::*;
-use crate::order::{NewOrder, Order};
-use crate::req::req_expect_header;
-use crate::trans::Transport;
-use crate::util::{base64url, read_json};
+use crate::{
+    api::{ApiAccount, ApiDirectory, ApiIdentifier, ApiOrder, ApiRevocation},
+    cert::Certificate,
+    error::*,
+    order::{NewOrder, Order},
+    req::req_expect_header,
+    trans::Transport,
+    util::{base64url, read_json},
+};
 
 mod akey;
 
