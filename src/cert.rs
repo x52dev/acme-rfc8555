@@ -36,14 +36,14 @@ pub fn create_rsa_key(bits: u32) -> Result<PKey<pkey::Private>> {
 
 /// Make a P-256 private key (from which we can derive a public key).
 pub fn create_p256_key() -> Result<PKey<pkey::Private>> {
-    let pri_key_ec = EcKey::generate(&*EC_GROUP_P256)?;
+    let pri_key_ec = EcKey::generate(&EC_GROUP_P256)?;
     let pkey = PKey::from_ec_key(pri_key_ec)?;
     Ok(pkey)
 }
 
 /// Make a P-384 private key pair (from which we can derive a public key).
 pub fn create_p384_key() -> Result<PKey<pkey::Private>> {
-    let pri_key_ec = EcKey::generate(&*EC_GROUP_P384)?;
+    let pri_key_ec = EcKey::generate(&EC_GROUP_P384)?;
     let pkey = PKey::from_ec_key(pri_key_ec)?;
     Ok(pkey)
 }
@@ -54,7 +54,7 @@ pub(crate) fn create_csr(pkey: &PKey<pkey::Private>, domains: &[&str]) -> Result
     let mut req_bld = X509ReqBuilder::new()?;
 
     // set private/public key in builder
-    req_bld.set_pubkey(&pkey)?;
+    req_bld.set_pubkey(pkey)?;
 
     // set all domains as alt names
     let mut stack = Stack::new()?;

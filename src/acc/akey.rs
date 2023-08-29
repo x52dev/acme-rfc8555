@@ -13,7 +13,7 @@ pub(crate) struct AcmeKey {
 
 impl AcmeKey {
     pub(crate) fn new() -> Result<AcmeKey> {
-        let pri_key = EcKey::generate(&*EC_GROUP_P256).context("EcKey")?;
+        let pri_key = EcKey::generate(&EC_GROUP_P256).context("EcKey")?;
         Ok(Self::from_key(pri_key))
     }
 

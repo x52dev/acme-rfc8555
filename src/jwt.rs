@@ -61,7 +61,7 @@ impl TryFrom<&AcmeKey> for Jwk {
         let mut x = openssl::bn::BigNum::new()?;
         let mut y = openssl::bn::BigNum::new()?;
         a.private_key().public_key().affine_coordinates_gfp(
-            &*EC_GROUP_P256,
+            &EC_GROUP_P256,
             &mut x,
             &mut y,
             &mut ctx,
