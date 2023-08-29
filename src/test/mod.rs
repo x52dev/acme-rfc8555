@@ -4,11 +4,9 @@ use std::{net::TcpListener, thread};
 
 use futures::Future;
 use hyper::{service::service_fn_ok, Body, Method, Request, Response, Server};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
-lazy_static! {
-    static ref RE_URL: regex::Regex = regex::Regex::new("<URL>").unwrap();
-}
+static RE_URL: Lazy<regex::Regex> = Lazy::new(|| regex::Regex::new("<URL>").unwrap());
 
 pub struct TestServer {
     pub dir_url: String,
