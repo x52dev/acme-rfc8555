@@ -1,17 +1,16 @@
 [package]
-name = "acme-micro"
-description = "Library for requesting certificates from an ACME provider (acme-lib fork)."
-license = "MIT"
-repository = "https://github.com/kpcyrd/acme-micro"
-readme = "README.md"
+name = "acme-lite"
 version = "0.12.0"
+description = "Library for requesting certificates from an ACME provider (acme-lib fork)."
 authors = [
     "Martin Algesten <martin@algesten.se>",
     "kpcyrd <git@rxv.cc>",
 ]
-keywords = ["letsencrypt", "acme"]
 categories = ["web-programming", "api-bindings"]
-edition = "2018"
+keywords = ["letsencrypt", "acme"]
+repository = "https://github.com/x52dev/acme-lite"
+license = "MIT"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
