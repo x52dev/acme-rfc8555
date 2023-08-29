@@ -1,3 +1,7 @@
+use der::{
+    time::{OffsetDateTime, PrimitiveDateTime},
+    DecodePem as _,
+};
 use lazy_static::lazy_static;
 use openssl::{
     ec::{Asn1Flag, EcGroup, EcKey},
@@ -9,7 +13,7 @@ use openssl::{
     x509::{extension::SubjectAlternativeName, X509Req, X509ReqBuilder, X509},
 };
 
-use crate::error::{Result, *};
+use crate::error::Result;
 
 lazy_static! {
     pub(crate) static ref EC_GROUP_P256: EcGroup = ec_group(Nid::X9_62_PRIME256V1);
@@ -141,33 +145,14 @@ impl Certificate {
             return Ok(89);
         }
 
-        // load as x509
-        let x509 = X509::from_pem(self.certificate.as_bytes())?;
+        let cert = x509_cert::Certificate::from_pem(self.certificate.as_bytes())?;
 
-        // convert asn1 time to Tm
-        let not_after = format!("{}", x509.not_after());
-        // Display trait produces this format, which is kinda dumb.
-        // Apr 19 08:48:46 2019 GMT
-        let expires = parse_date(&not_after)?;
-        let dur = expires - time::now();
+        let not_after = cert.tbs_certificate.validity.not_after.to_date_time();
+        // TODO: justify assume_utc
+        let not_after = PrimitiveDateTime::try_from(not_after).unwrap().assume_utc();
 
-        Ok(dur.num_days())
-    }
-}
+        let diff = not_after - OffsetDateTime::now_utc();
 
-fn parse_date(s: &str) -> Result<time::Tm> {
-    debug!("Parse date/time: {}", s);
-    let tm = time::strptime(s, "%h %e %H:%M:%S %Y %Z")?;
-    Ok(tm)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_parse_date() {
-        let x = parse_date("May  3 07:40:15 2019 GMT").unwrap();
-        assert_eq!(time::strftime("%F %T", &x).unwrap(), "2019-05-03 07:40:15");
+        Ok(diff.whole_days())
     }
 }
