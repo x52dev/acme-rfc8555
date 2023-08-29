@@ -22,6 +22,8 @@ jobs:
         toolchain:
           - { name: msrv, version: '1.66' }
           - { name: stable, version: stable }
+
+    name: Test / ${{ matrix.toolchain.name }}
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust (${{ matrix.toolchain.name }})
