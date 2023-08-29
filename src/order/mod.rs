@@ -315,7 +315,7 @@ mod test {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::from_url(url)?;
-        let acc = dir.register_account(vec!["mailto:foo@bar.com".to_string()])?;
+        let acc = dir.register_account(Some(vec!["mailto:foo@bar.com".to_string()]))?;
         let ord = acc.new_order("acmetest.example.com", &[])?;
         let _ = ord.authorizations()?;
         Ok(())
@@ -326,7 +326,7 @@ mod test {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::from_url(url)?;
-        let acc = dir.register_account(vec!["mailto:foo@bar.com".to_string()])?;
+        let acc = dir.register_account(Some(vec!["mailto:foo@bar.com".to_string()]))?;
         let ord = acc.new_order("acmetest.example.com", &[])?;
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
@@ -340,7 +340,7 @@ mod test {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::from_url(url)?;
-        let acc = dir.register_account(vec!["mailto:foo@bar.com".to_string()])?;
+        let acc = dir.register_account(Some(vec!["mailto:foo@bar.com".to_string()]))?;
         let ord = acc.new_order("acmetest.example.com", &[])?;
 
         // shortcut auth

@@ -1,10 +1,9 @@
-//
 use std::sync::Arc;
 
 use crate::{
     acc::AcmeKey,
     api::{ApiAccount, ApiDirectory},
-    error::*,
+    error::Result,
     req::{req_expect_header, req_get, req_handle_error},
     trans::{NoncePool, Transport},
     util::read_json,
@@ -57,17 +56,17 @@ impl Directory {
         })
     }
 
-    pub fn register_account(&self, contact: Vec<String>) -> Result<Account> {
+    pub fn register_account(&self, contact: Option<Vec<String>>) -> Result<Account> {
         let acme_key = AcmeKey::new()?;
         self.upsert_account(acme_key, contact)
     }
 
-    pub fn load_account(&self, pem: &str, contact: Vec<String>) -> Result<Account> {
+    pub fn load_account(&self, pem: &str, contact: Option<Vec<String>>) -> Result<Account> {
         let acme_key = AcmeKey::from_pem(pem.as_bytes())?;
         self.upsert_account(acme_key, contact)
     }
 
-    fn upsert_account(&self, acme_key: AcmeKey, contact: Vec<String>) -> Result<Account> {
+    fn upsert_account(&self, acme_key: AcmeKey, contact: Option<Vec<String>>) -> Result<Account> {
         // Prepare making a call to newAccount. This is fine to do both for
         // new keys and existing. For existing the spec says to return a 200
         // with the Location header set to the key id (kid).
@@ -80,7 +79,7 @@ impl Directory {
         let mut transport = Transport::new(&self.nonce_pool, acme_key);
         let res = transport.call_jwk(&self.api_directory.newAccount, &acc)?;
         let kid = req_expect_header(&res, "location")?;
-        debug!("Key id is: {}", kid);
+        log::debug!("Key id is: {}", kid);
         let api_account: ApiAccount = read_json(res)?;
 
         // fill in the server returned key id
@@ -117,7 +116,7 @@ mod test {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::from_url(url)?;
-        let _ = dir.register_account(vec!["mailto:foo@bar.com".to_string()])?;
+        let _ = dir.register_account(Some(vec!["mailto:foo@bar.com".to_string()]))?;
         Ok(())
     }
 

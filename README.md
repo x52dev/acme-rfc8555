@@ -7,13 +7,14 @@ Uses ACME v2 to issue/renew certificates.
 ## Example
 
 ```rust
+use std::time::Duration;
+
 use acme_lite::{Error, Certificate, Directory, DirectoryUrl};
 use acme_lite::create_p384_key;
-use std::time::Duration;
 
 fn request_cert() -> Result<Certificate, Error> {
 
-// Use DirectoryUrl::LetsEncrypStaging for dev/testing.
+// Use DirectoryUrl::LetsEncryptStaging for dev/testing.
 let url = DirectoryUrl::LetsEncrypt;
 
 // Create a directory entrypoint.
@@ -115,9 +116,9 @@ See [`http_challenge`] and [`dns_challenge`].
 
 When creating a new order, it's possible to provide multiple alt-names that will also be part of the certificate. The ACME API requires you to prove ownership of each such domain. See [`authorizations`].
 
-[`http_challenge`]: order/struct.Auth.html#method.http_challenge
-[`dns_challenge`]: order/struct.Auth.html#method.dns_challenge
-[`authorizations`]: order/struct.NewOrder.html#method.authorizations
+[`http_challenge`]: https://docs.rs/acme-lite/latest/acme_lite/order/struct.Auth.html#method.http_challenge
+[`dns_challenge`]: https://docs.rs/acme-lite/latest/acme_lite/order/struct.Auth.html#method.dns_challenge
+[`authorizations`]: https://docs.rs/acme-lite/latest/acme_lite/order/struct.NewOrder.html#method.authorizations
 
 ### Rate limits
 

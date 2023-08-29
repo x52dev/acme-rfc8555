@@ -69,9 +69,8 @@
 //!     // the file/contents in the correct place.
 //!     // update_my_web_server(&path, &proof);
 //!
-//!     // After the file is accessible from the web, the calls
-//!     // this to tell the ACME API to start checking the
-//!     // existence of the proof.
+//!     // After the file is accessible from the web, this tells the ACME API
+//!     // to start checking the existence of the proof.
 //!     //
 //!     // The order at ACME will change status to either
 //!     // confirm ownership of the domain, or fail due to the
@@ -121,9 +120,9 @@
 //! be part of the certificate. The ACME API requires you to prove ownership of each such
 //! domain. See [`authorizations`].
 //!
-//! [`http_challenge`]: order/struct.Auth.html#method.http_challenge
-//! [`dns_challenge`]: order/struct.Auth.html#method.dns_challenge
-//! [`authorizations`]: order/struct.NewOrder.html#method.authorizations
+//! [`http_challenge`]: https://docs.rs/acme-lite/latest/acme_lite/order/struct.Auth.html#method.http_challenge
+//! [`dns_challenge`]: https://docs.rs/acme-lite/latest/acme_lite/order/struct.Auth.html#method.dns_challenge
+//! [`authorizations`]: https://docs.rs/acme-lite/latest/acme_lite/order/struct.NewOrder.html#method.authorizations
 //!
 //! ## Rate limits
 //!

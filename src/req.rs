@@ -1,20 +1,20 @@
 use std::time::Duration;
 
-use crate::{api::ApiProblem, error::*};
+use crate::api::ApiProblem;
 
 pub(crate) type ReqResult<T> = std::result::Result<T, ApiProblem>;
 
 pub(crate) fn req_get(url: &str) -> ureq::Response {
     let client = ureq_agent();
     let req = client.get(url);
-    trace!("{req:?}");
+    log::trace!("{req:?}");
     req.call().unwrap()
 }
 
 pub(crate) fn req_head(url: &str) -> ureq::Response {
     let client = ureq_agent();
     let req = client.head(url);
-    trace!("{req:?}");
+    log::trace!("{req:?}");
     req.call().unwrap()
 }
 
@@ -31,7 +31,7 @@ pub(crate) fn req_post(url: &str, body: &str) -> ureq::Response {
     let req = client
         .post(url)
         .set("content-type", "application/jose+json");
-    trace!("{req:?} {body}");
+    log::trace!("{req:?} {body}");
     req.send_string(body).unwrap()
 }
 

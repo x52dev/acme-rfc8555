@@ -38,8 +38,10 @@ impl Serialize for ApiEmptyObject {
 pub struct ApiProblem {
     #[serde(rename = "type")]
     pub _type: String,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subproblems: Option<Vec<ApiSubproblem>>,
 }
@@ -82,10 +84,13 @@ pub struct ApiDirectory {
     pub newNonce: String,
     pub newAccount: String,
     pub newOrder: String,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub newAuthz: Option<String>,
+
     pub revokeCert: String,
     pub keyChange: String,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<ApiDirectoryMeta>,
 }
@@ -94,10 +99,13 @@ pub struct ApiDirectory {
 pub struct ApiDirectoryMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub termsOfService: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub website: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caaIdentities: Option<Vec<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub externalAccountRequired: Option<bool>,
 }
@@ -121,10 +129,13 @@ impl ApiDirectoryMeta {
 pub struct ApiAccount {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
-    #[serde(default)]
-    pub contact: Vec<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contact: Option<Vec<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub termsOfServiceAgreed: Option<bool>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orders: Option<String>,
 }

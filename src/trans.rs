@@ -72,7 +72,7 @@ impl Transport {
             // Sign the body.
             let body = make_body(url, nonce, &self.acme_key, body)?;
 
-            debug!("Call endpoint {}", url);
+            log::debug!("Call endpoint {}", url);
 
             // Post it to the URL
             let response = req_post(url, &body);
@@ -87,12 +87,12 @@ impl Transport {
             if let Err(problem) = &result {
                 if problem.is_bad_nonce() {
                     // retry the request with a new nonce.
-                    debug!("Retrying on bad nonce");
+                    log::debug!("Retrying on bad nonce");
                     continue;
                 }
                 // it seems we sometimes make bad JWTs. Why?!
                 if problem.is_jwt_verification_error() {
-                    debug!("Retrying on: {}", problem);
+                    log::debug!("Retrying on: {}", problem);
                     continue;
                 }
             }
@@ -119,7 +119,7 @@ impl NoncePool {
 
     fn extract_nonce(&self, res: &ureq::Response) {
         if let Some(nonce) = res.header("replay-nonce") {
-            trace!("Extract nonce");
+            log::trace!("Extract nonce");
             let mut pool = self.pool.lock().unwrap();
             pool.push_back(nonce.to_string());
             if pool.len() > 10 {
@@ -132,11 +132,11 @@ impl NoncePool {
         {
             let mut pool = self.pool.lock().unwrap();
             if let Some(nonce) = pool.pop_front() {
-                trace!("Use previous nonce");
+                log::trace!("Use previous nonce");
                 return Ok(nonce);
             }
         }
-        debug!("Request new nonce");
+        log::debug!("Request new nonce");
         let res = req_head(&self.nonce_url);
         Ok(req_expect_header(&res, "replay-nonce")?)
     }
