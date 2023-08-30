@@ -71,7 +71,7 @@ impl Auth {
     /// use std::io::Write;
     /// use std::time::Duration;
     ///
-    /// fn web_authorize(auth: &Auth) -> Result<(), Error> {
+    /// async fn web_authorize(auth: &Auth) -> Result<(), Error> {
     ///   let challenge = auth.http_challenge().unwrap();
     ///   // Assuming our web server's root is under /var/www
     ///   let path = {
@@ -80,7 +80,7 @@ impl Auth {
     ///   };
     ///   let mut file = File::create(&path)?;
     ///   file.write_all(challenge.http_proof()?.as_bytes())?;
-    ///   challenge.validate(Duration::from_millis(5000))?;
+    ///   challenge.validate(Duration::from_millis(5000)).await?;
     ///   Ok(())
     /// }
     /// ```
@@ -105,11 +105,11 @@ impl Auth {
     /// use acme_lite::Error;
     /// use std::time::Duration;
     ///
-    /// fn dns_authorize(auth: &Auth) -> Result<(), Error> {
+    /// async fn dns_authorize(auth: &Auth) -> Result<(), Error> {
     ///   let challenge = auth.dns_challenge().unwrap();
     ///   let record = format!("_acme-challenge.{}.", auth.domain_name());
     ///   // route_53_set_record(&record, "TXT", challenge.dns_proof());
-    ///   challenge.validate(Duration::from_millis(5000))?;
+    ///   challenge.validate(Duration::from_millis(5000)).await?;
     ///   Ok(())
     /// }
     /// ```

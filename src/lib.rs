@@ -11,13 +11,14 @@
 //! use acme_lite::create_p384_key;
 //! use std::time::Duration;
 //!
-//! fn request_cert() -> Result<Certificate, Error> {
+//! # #[tokio::test]
+//! async fn request_cert() -> Result<Certificate, Error> {
 //!
-//! // Use DirectoryUrl::LetsEncrypStaging for dev/testing.
+//! // Use DirectoryUrl::LetsEncryptStaging for dev/testing.
 //! let url = DirectoryUrl::LetsEncrypt;
 //!
 //! // Create a directory entrypoint.
-//! let dir = Directory::from_url(url)?;
+//! let dir = Directory::from_url(url).await?;
 //!
 //! // Your contact addresses, note the `mailto:`
 //! let contact = vec!["mailto:foo@bar.com".to_string()];
@@ -85,22 +86,23 @@
 //! // Ownership is proven. Create a private key for
 //! // the certificate. These are provided for convenience, you
 //! // can provide your own keypair instead if you want.
-//! let pkey_pri = create_p384_key()?;
+//! let pkey_pri = create_p256_key();
 //!
 //! // Submit the CSR. This causes the ACME provider to enter a
 //! // state of "processing" that must be polled until the
 //! // certificate is either issued or rejected. Again we poll
 //! // for the status change.
-//! let ord_cert =
-//!     ord_csr.finalize_pkey(pkey_pri, Duration::from_millis(5000))?;
+//! let ord_cert = ord_csr.finalize_signing_key(pkey_pri, Duration::from_millis(5000)).await?;
 //!
 //! // Now download the certificate. Also stores the cert in
 //! // the persistence.
-//! let cert = ord_cert.download_cert()?;
+//! let cert = ord_cert.download_cert().await?;
 //! println!("{:?}", cert);
 //!
 //! Ok(cert)
 //! }
+//!
+//!
 //! ```
 //!
 //! ## Domain ownership

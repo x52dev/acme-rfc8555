@@ -10,29 +10,30 @@ Uses ACME v2 to issue/renew certificates.
 use std::time::Duration;
 
 use acme_lite::{Error, Certificate, Directory, DirectoryUrl};
-use acme_lite::create_p384_key;
+use acme_lite::create_p256_key;
 
-fn request_cert() -> Result<Certificate, Error> {
+#[tokio::main(flavor = "current_thread")]
+async fn request_cert() -> Result<Certificate, Error> {
 
 // Use DirectoryUrl::LetsEncryptStaging for dev/testing.
 let url = DirectoryUrl::LetsEncrypt;
 
 // Create a directory entrypoint.
-let dir = Directory::from_url(url)?;
+let dir = Directory::from_url(url).await?;
 
 // Your contact addresses, note the `mailto:`
 let contact = vec!["mailto:foo@bar.com".to_string()];
 
 // Generate a private key and register an account with your ACME provider.
 // You should write it to disk any use `load_account` afterwards.
-let acc = dir.register_account(Some(contact.clone()))?;
+let acc = dir.register_account(Some(contact.clone())).await?;
 
 // Example of how to load an account from string:
 let privkey = acc.acme_private_key_pem()?;
-let acc = dir.load_account(&privkey, Some(contact))?;
+let acc = dir.load_account(&privkey, Some(contact)).await?;
 
 // Order a new TLS certificate for a domain.
-let mut ord_new = acc.new_order("mydomain.io", &[])?;
+let mut ord_new = acc.new_order("mydomain.io", &[]).await?;
 
 // If the ownership of the domain(s) have already been
 // authorized in a previous order, you might be able to
@@ -45,7 +46,7 @@ let ord_csr = loop {
 
     // Get the possible authorizations (for a single domain
     // this will only be one element).
-    let auths = ord_new.authorizations()?;
+    let auths = ord_new.authorizations().await?;
 
     // For HTTP, the challenge is a text file that needs to
     // be placed in your web server's root:
@@ -78,26 +79,25 @@ let ord_csr = loop {
     // confirm ownership of the domain, or fail due to the
     // not finding the proof. To see the change, we poll
     // the API with 5000 milliseconds wait between.
-    chall.validate(Duration::from_millis(5000))?;
+    chall.validate(Duration::from_millis(5000)).await?;
 
     // Update the state against the ACME API.
-    ord_new.refresh()?;
+    ord_new.refresh().await?;
 };
 
 // Ownership is proven. Create a private key for
 // the certificate. These are provided for convenience, you
 // can provide your own keypair instead if you want.
-let pkey_pri = create_p384_key()?;
+let pkey_pri = create_p256_key();
 
 // Submit the CSR. This causes the ACME provider to enter a
 // state of "processing" that must be polled until the
 // certificate is either issued or rejected. Again we poll
 // for the status change.
-let ord_cert =
-    ord_csr.finalize_pkey(pkey_pri, Duration::from_millis(5000))?;
+let ord_cert = ord_csr.finalize_signing_key(pkey_pri, Duration::from_millis(5000)).await?;
 
 // Finally download the certificate.
-let cert = ord_cert.download_cert()?;
+let cert = ord_cert.download_cert().await?;
 println!("{:?}", cert);
 
 Ok(cert)

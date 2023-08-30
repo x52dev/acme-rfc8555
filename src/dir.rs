@@ -163,7 +163,7 @@ mod test {
 
     //     let (pkey_pri, pkey_pub) = create_p384_key();
 
-    //     let ord = ord.finalize_pkey(pkey_pri, pkey_pub, 5000)?;
+    //     let ord = ord.finalize_signing_key(pkey_pri, pkey_pub, 5000)?;
 
     //     let cert = ord.download_and_save_cert()?;
     //     println!(
