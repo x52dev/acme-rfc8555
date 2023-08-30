@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use base64::prelude::*;
 use serde::Serialize;
 use sha2::Digest as _;
 
@@ -12,7 +13,6 @@ use crate::{
     error::Result,
     jwt::{Jwk, Jws, JwsProtected},
     req::{req_expect_header, req_handle_error, req_head, req_post},
-    util::base64url,
 };
 
 /// JWS payload and nonce handling for requests to the API.
@@ -178,7 +178,7 @@ fn jws_with<T: Serialize + ?Sized>(
 ) -> Result<String> {
     let protected = {
         let pro_json = serde_json::to_string(&protected)?;
-        base64url(pro_json.as_bytes())
+        BASE64_URL_SAFE_NO_PAD.encode(pro_json.as_bytes())
     };
     let payload = {
         let pay_json = serde_json::to_string(payload)?;
@@ -187,7 +187,7 @@ fn jws_with<T: Serialize + ?Sized>(
             // not be further base64url encoded.
             "".to_string()
         } else {
-            base64url(pay_json.as_bytes())
+            BASE64_URL_SAFE_NO_PAD.encode(pay_json.as_bytes())
         }
     };
 
@@ -200,7 +200,7 @@ fn jws_with<T: Serialize + ?Sized>(
     let mut v = Vec::with_capacity(r.len() + s.len());
     v.extend_from_slice(&r);
     v.extend_from_slice(&s);
-    let signature = base64url(&v);
+    let signature = BASE64_URL_SAFE_NO_PAD.encode(&v);
 
     let jws = Jws::new(protected, payload, signature);
 

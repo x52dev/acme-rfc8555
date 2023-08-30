@@ -43,7 +43,7 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
 
     let problem = if res.headers().get("content-type").unwrap() == "application/problem+json" {
         // if we were sent a problem+json, deserialize it
-        let body = req_safe_read_body(res).await;
+        let body = res.text().await.unwrap();
         serde_json::from_str(&body).unwrap_or_else(|err| ApiProblem {
             _type: "problemJsonFail".into(),
             detail: Some(format!(
@@ -54,8 +54,8 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
     } else {
         // some other problem
         let status = format!("{} {}", res.status(), res.status().as_str());
-        let body = req_safe_read_body(res).await;
-        let detail = format!("{} body: {}", status, body);
+        let body = res.text().await.unwrap();
+        let detail = format!("{status} body: {body}");
         ApiProblem {
             _type: "httpReqError".into(),
             detail: Some(detail),
@@ -75,15 +75,4 @@ pub(crate) fn req_expect_header(res: &reqwest::Response, name: &str) -> ReqResul
             detail: None,
             subproblems: None,
         })
-}
-
-pub(crate) async fn req_safe_read_body(res: reqwest::Response) -> String {
-    res.text().await.unwrap()
-
-    // let mut res_body = String::new();
-    // let mut read = res.text().await.unwrap();
-    // // letsencrypt sometimes closes the TLS abruptly causing io error
-    // // even though we did capture the body.
-    // read.read_to_string(&mut res_body).ok();
-    // res_body
 }

@@ -1,8 +1,9 @@
 use std::convert::TryFrom;
 
+use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{acc::AcmeKey, util::base64url, Result};
+use crate::{acc::AcmeKey, Result};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub(crate) struct JwsProtected {
@@ -69,8 +70,8 @@ impl TryFrom<&AcmeKey> for Jwk {
             kty: "EC".into(),
             crv: "P-256".into(),
             _use: "sig".into(),
-            x: base64url(&x),
-            y: base64url(&y),
+            x: BASE64_URL_SAFE_NO_PAD.encode(x),
+            y: BASE64_URL_SAFE_NO_PAD.encode(y),
         })
     }
 }

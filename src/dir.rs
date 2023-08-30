@@ -6,7 +6,6 @@ use crate::{
     error::Result,
     req::{req_expect_header, req_get, req_handle_error},
     trans::{NoncePool, Transport},
-    util::read_json,
     Account,
 };
 
@@ -48,8 +47,8 @@ impl Directory {
     pub async fn from_url(url: DirectoryUrl<'_>) -> Result<Directory> {
         let dir_url = url.to_url();
         let res = req_handle_error(req_get(dir_url).await).await?;
-        let api_directory: ApiDirectory = read_json(res).await?;
-        let nonce_pool = Arc::new(NoncePool::new(&api_directory.newNonce));
+        let api_directory = res.json::<ApiDirectory>().await?;
+        let nonce_pool = Arc::new(NoncePool::new(&api_directory.new_nonce));
         Ok(Directory {
             nonce_pool,
             api_directory,
@@ -76,17 +75,17 @@ impl Directory {
         // with the Location header set to the key id (kid).
         let acc = ApiAccount {
             contact,
-            termsOfServiceAgreed: Some(true),
+            terms_of_service_agreed: Some(true),
             ..Default::default()
         };
 
         let mut transport = Transport::new(&self.nonce_pool, acme_key);
         let res = transport
-            .call_jwk(&self.api_directory.newAccount, &acc)
+            .call_jwk(&self.api_directory.new_account, &acc)
             .await?;
         let kid = req_expect_header(&res, "location")?;
         log::debug!("Key id is: {}", kid);
-        let api_account: ApiAccount = read_json(res).await?;
+        let api_account = res.json::<ApiAccount>().await?;
 
         // fill in the server returned key id
         transport.set_key_id(kid);
@@ -106,7 +105,7 @@ impl Directory {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[tokio::test]

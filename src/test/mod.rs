@@ -1,10 +1,11 @@
 #![allow(clippy::trivial_regex)]
 
-use std::convert::Infallible;
-use std::net::TcpListener;
+use std::{convert::Infallible, net::TcpListener};
 
-use hyper::service::make_service_fn;
-use hyper::{service::service_fn, Body, Method, Request, Response, Server};
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Body, Method, Request, Response, Server,
+};
 use once_cell::sync::Lazy;
 
 static RE_URL: Lazy<regex::Regex> = Lazy::new(|| regex::Regex::new("<URL>").unwrap());

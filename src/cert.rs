@@ -17,7 +17,7 @@ use crate::error::Result;
 ///
 /// This library does not check the number of bits used to create the key pair.
 /// For Let's Encrypt, the bits must be between 2048 and 4096.
-pub fn create_rsa_key(bit_size: usize) -> Result<rsa::RsaPrivateKey> {
+pub fn create_rsa_key(bit_size: usize) -> anyhow::Result<rsa::RsaPrivateKey> {
     let csprng = &mut rand::thread_rng();
     Ok(rsa::RsaPrivateKey::new(csprng, bit_size)?)
 }
@@ -37,7 +37,7 @@ pub fn create_p384_key() -> ecdsa::SigningKey<p384::NistP384> {
 pub(crate) fn create_csr(
     signer: &p256::ecdsa::SigningKey,
     domains: &[&str],
-) -> Result<x509_cert::request::CertReq> {
+) -> anyhow::Result<x509_cert::request::CertReq> {
     let subject = "CN=localhost".parse::<Name>().unwrap();
 
     let mut csr = CsrBuilder::new(subject, signer).unwrap();
@@ -87,7 +87,7 @@ impl Certificate {
     }
 
     /// The private key as DER.
-    pub fn private_key_der(&self) -> Result<Vec<u8>> {
+    pub fn private_key_der(&self) -> anyhow::Result<Vec<u8>> {
         let signing_key = ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&self.private_key)?;
         let der = signing_key.to_pkcs8_der()?;
         Ok(der.as_bytes().to_vec())
@@ -99,7 +99,7 @@ impl Certificate {
     }
 
     /// The issued certificate as DER.
-    pub fn certificate_der(&self) -> Result<Vec<u8>> {
+    pub fn certificate_der(&self) -> anyhow::Result<Vec<u8>> {
         let x509 = x509_cert::Certificate::from_pem(&self.certificate)?;
         x509.to_der().context("der")
     }
@@ -117,7 +117,7 @@ impl Certificate {
             return Ok(89);
         }
 
-        let cert = x509_cert::Certificate::from_pem(self.certificate.as_bytes())?;
+        let cert = x509_cert::Certificate::from_pem(&self.certificate)?;
 
         let not_after = cert.tbs_certificate.validity.not_after.to_date_time();
         // TODO: justify assume_utc

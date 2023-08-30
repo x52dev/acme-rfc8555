@@ -1,14 +1,14 @@
-//
-use std::{convert::TryInto, sync::Arc, thread, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
+use anyhow::anyhow;
+use base64::prelude::*;
 use sha2::{Digest as _, Sha256};
 
 use crate::{
     acc::{AccountInner, AcmeKey},
     api::{ApiAuth, ApiChallenge, ApiEmptyObject, ApiEmptyString},
-    error::*,
-    jwt::*,
-    util::{base64url, read_json},
+    error::Result,
+    jwt::{Jwk, JwkThumb},
 };
 
 /// An authorization ([ownership proof]) for a domain name.
@@ -216,7 +216,7 @@ impl<A> Challenge<A> {
         }
     }
 
-    /// Check whether this challlenge really need validation. It might already been
+    /// Check whether this challenge really need validation. It might already been
     /// done in a previous order for the same account.
     pub fn need_validate(&self) -> bool {
         self.api_challenge.is_status_pending()
@@ -227,13 +227,13 @@ impl<A> Challenge<A> {
     /// The user must first update the DNS record or HTTP web server depending
     /// on the type challenge being validated.
     pub async fn validate(&self, delay: Duration) -> Result<()> {
-        let url_chall = &self.api_challenge.url;
         let res = self
             .inner
             .transport
-            .call(url_chall, &ApiEmptyObject)
+            .call(&self.api_challenge.url, &ApiEmptyObject)
             .await?;
-        let _: ApiChallenge = read_json(res).await?;
+
+        let _ = res.json::<ApiChallenge>().await?;
 
         let auth = wait_for_auth_status(&self.inner, &self.auth_url, delay).await?;
 
@@ -243,6 +243,7 @@ impl<A> Challenge<A> {
                 .iter()
                 .filter_map(|c| c.error.as_ref())
                 .next();
+
             let reason = if let Some(error) = error {
                 format!(
                     "Failed: {}",
@@ -251,7 +252,8 @@ impl<A> Challenge<A> {
             } else {
                 "Validation failed and no error found".into()
             };
-            bail!("Validation failed: {:?}", reason);
+
+            return Err(anyhow!("Validation failed: {:?}", reason));
         }
 
         Ok(())
@@ -264,13 +266,13 @@ impl<A> Challenge<A> {
 }
 
 fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> Result<String> {
-    let jwk: Jwk = key.try_into()?;
-    let jwk_thumb: JwkThumb = (&jwk).into();
+    let jwk = Jwk::try_from(key)?;
+    let jwk_thumb = JwkThumb::from(&jwk);
     let jwk_json = serde_json::to_string(&jwk_thumb)?;
-    let digest = base64url(&Sha256::digest(jwk_json.as_bytes()));
-    let key_auth = format!("{}.{}", token, digest);
+    let digest = BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(jwk_json.as_bytes()));
+    let key_auth = format!("{token}.{digest}");
     let res = if extra_sha256 {
-        base64url(&Sha256::digest(key_auth.as_bytes()))
+        BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(key_auth.as_bytes()))
     } else {
         key_auth
     };
@@ -284,7 +286,7 @@ async fn wait_for_auth_status(
 ) -> Result<ApiAuth> {
     let auth = loop {
         let res = inner.transport.call(auth_url, &ApiEmptyString).await?;
-        let auth: ApiAuth = read_json(res).await?;
+        let auth = res.json::<ApiAuth>().await?;
         if !auth.is_status_pending() {
             break auth;
         }
@@ -294,7 +296,7 @@ async fn wait_for_auth_status(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::*;
 
     #[tokio::test]
@@ -309,14 +311,13 @@ mod test {
         let authz = ord.authorizations().await?;
         assert!(authz.len() == 1);
         let auth = &authz[0];
-        {
-            let http = auth.http_challenge().unwrap();
-            assert!(http.need_validate());
-        }
-        {
-            let dns = auth.dns_challenge().unwrap();
-            assert!(dns.need_validate());
-        }
+
+        let http = auth.http_challenge().unwrap();
+        assert!(http.need_validate());
+
+        let dns = auth.dns_challenge().unwrap();
+        assert!(dns.need_validate());
+
         Ok(())
     }
 }

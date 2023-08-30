@@ -20,6 +20,8 @@
 
 use std::{sync::Arc, thread, time::Duration};
 
+use anyhow::{anyhow, Context as _};
+use base64::prelude::*;
 use der::Encode as _;
 use ecdsa::SigningKey;
 use pkcs8::{DecodePrivateKey as _, EncodePrivateKey as _};
@@ -28,8 +30,7 @@ use crate::{
     acc::AccountInner,
     api::{ApiAuth, ApiEmptyString, ApiFinalize, ApiOrder},
     cert::{create_csr, Certificate},
-    error::*,
-    util::{base64url, read_json},
+    error::Result,
 };
 
 mod auth;
@@ -74,7 +75,7 @@ pub(crate) async fn refresh_order(
 
 #[cfg(not(test))]
 async fn api_order_of(res: reqwest::Response, _want_status: &str) -> Result<ApiOrder> {
-    read_json(res).await
+    Ok(res.json().await?)
 }
 
 #[cfg(test)]
@@ -166,7 +167,7 @@ impl NewOrder {
                     .transport
                     .call(auth_url, &ApiEmptyString)
                     .await?;
-                let api_auth: ApiAuth = read_json(res).await?;
+                let api_auth = res.json::<ApiAuth>().await?;
                 result.push(Auth::new(&self.order.inner, api_auth, auth_url));
             }
         }
@@ -239,7 +240,7 @@ impl CsrOrder {
 
         // this is not the same as PEM.
         let csr_der = csr.to_der()?;
-        let csr_enc = base64url(&csr_der);
+        let csr_enc = BASE64_URL_SAFE_NO_PAD.encode(&csr_der);
         let finalize = ApiFinalize { csr: csr_enc };
 
         let inner = self.order.inner;
@@ -256,7 +257,7 @@ impl CsrOrder {
         let order = wait_for_order_status(&inner, &order_url, delay).await?;
 
         if !order.api_order.is_status_valid() {
-            bail!("Order is in status: {:?}", order.api_order.status);
+            return Err(anyhow!("Order is in status: {:?}", order.api_order.status));
         }
 
         Ok(CertOrder { signing_key, order })
@@ -295,7 +296,7 @@ impl CertOrder {
             .order
             .api_order
             .certificate
-            .ok_or_else(|| anyhow::anyhow!("certificate url"))?;
+            .ok_or_else(|| anyhow!("certificate url"))?;
 
         let inner = self.order.inner;
 
@@ -315,9 +316,9 @@ impl CertOrder {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
-    use crate::*;
+    use crate::{cert, Directory, DirectoryUrl};
 
     #[tokio::test]
     async fn test_get_authorizations() -> Result<()> {

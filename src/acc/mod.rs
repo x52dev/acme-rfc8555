@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
+use base64::prelude::*;
 use zeroize::Zeroizing;
 
 use crate::{
     api::{ApiAccount, ApiDirectory, ApiIdentifier, ApiOrder, ApiRevocation},
     cert::Certificate,
-    error::*,
+    error::Result,
     order::{NewOrder, Order},
     req::req_expect_header,
     trans::Transport,
-    util::{base64url, read_json},
 };
 
 mod acme_key;
@@ -90,11 +90,11 @@ impl Account {
             ..Default::default()
         };
 
-        let new_order_url = &self.inner.api_directory.newOrder;
+        let new_order_url = &self.inner.api_directory.new_order;
 
         let res = self.inner.transport.call(new_order_url, &order).await?;
         let order_url = req_expect_header(&res, "location")?;
-        let api_order: ApiOrder = read_json(res).await?;
+        let api_order = res.json::<ApiOrder>().await?;
 
         let order = Order::new(&self.inner, api_order, order_url);
         Ok(NewOrder { order })
@@ -107,14 +107,14 @@ impl Account {
         reason: RevocationReason,
     ) -> Result<()> {
         // convert to base64url of the DER (which is not PEM).
-        let certificate = base64url(&cert.certificate_der()?);
+        let certificate = BASE64_URL_SAFE_NO_PAD.encode(cert.certificate_der()?);
 
         let revoc = ApiRevocation {
             certificate,
             reason: reason as usize,
         };
 
-        let url = &self.inner.api_directory.revokeCert;
+        let url = &self.inner.api_directory.revoke_cert;
         self.inner.transport.call(url, &revoc).await?;
 
         Ok(())
@@ -144,8 +144,9 @@ pub enum RevocationReason {
 }
 
 #[cfg(test)]
-mod test {
-    use crate::*;
+mod tests {
+    use super::*;
+    use crate::{Directory, DirectoryUrl};
 
     #[tokio::test]
     async fn test_create_order() -> Result<()> {

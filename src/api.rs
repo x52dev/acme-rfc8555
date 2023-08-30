@@ -1,40 +1,35 @@
 //! Low level API JSON objects.
 //!
 //! Unstable and not to be used directly. Provided to aid debugging.
-#![allow(non_snake_case)]
-#![allow(non_camel_case_types)]
+
+use std::fmt;
 
 use serde::{
     ser::{SerializeMap, Serializer},
     Deserialize, Serialize,
 };
 
-use crate::error::*;
+use crate::error::Result;
 
 /// Serializes to `""`
 pub struct ApiEmptyString;
+
 impl Serialize for ApiEmptyString {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str("")
     }
 }
 
 /// Serializes to `{}`
 pub struct ApiEmptyObject;
+
 impl Serialize for ApiEmptyObject {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let m = serializer.serialize_map(Some(0))?;
-        m.end()
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_map(Some(0))?.end()
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiProblem {
     #[serde(rename = "type")]
     pub _type: String,
@@ -50,6 +45,7 @@ impl ApiProblem {
     pub fn is_bad_nonce(&self) -> bool {
         self._type == "badNonce"
     }
+
     pub fn is_jwt_verification_error(&self) -> bool {
         (self._type == "urn:acme:error:malformed"
             || self._type == "urn:ietf:params:acme:error:malformed")
@@ -61,17 +57,17 @@ impl ApiProblem {
     }
 }
 
-impl std::fmt::Display for ApiProblem {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for ApiProblem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(detail) = &self.detail {
-            write!(f, "{}: {}", self._type, detail)
+            write!(f, "{}: {detail}", self._type)
         } else {
             write!(f, "{}", self._type)
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiSubproblem {
     #[serde(rename = "type")]
     pub _type: String,
@@ -79,40 +75,42 @@ pub struct ApiSubproblem {
     pub identifier: Option<ApiIdentifier>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiDirectory {
-    pub newNonce: String,
-    pub newAccount: String,
-    pub newOrder: String,
+    pub new_nonce: String,
+    pub new_account: String,
+    pub new_order: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub newAuthz: Option<String>,
+    pub new_authz: Option<String>,
 
-    pub revokeCert: String,
-    pub keyChange: String,
+    pub revoke_cert: String,
+    pub key_change: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<ApiDirectoryMeta>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiDirectoryMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub termsOfService: Option<String>,
+    pub terms_of_service: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub website: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub caaIdentities: Option<Vec<String>>,
+    pub caa_identities: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub externalAccountRequired: Option<bool>,
+    pub external_account_required: Option<bool>,
 }
 
 impl ApiDirectoryMeta {
-    pub fn externalAccountRequired(&self) -> bool {
-        self.externalAccountRequired.unwrap_or(false)
+    pub fn external_account_required(&self) -> bool {
+        self.external_account_required.unwrap_or(false)
     }
 }
 
@@ -125,7 +123,8 @@ impl ApiDirectoryMeta {
 //      "termsOfServiceAgreed": true,
 //      "orders": "https://example.com/acme/acct/evOfKhNU60wg/orders"
 //    }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiAccount {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
@@ -134,7 +133,7 @@ pub struct ApiAccount {
     pub contact: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub termsOfServiceAgreed: Option<bool>,
+    pub terms_of_service_agreed: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orders: Option<String>,
@@ -144,14 +143,17 @@ impl ApiAccount {
     pub fn is_status_valid(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("valid")
     }
+
     pub fn is_status_deactivated(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("deactivated")
     }
+
     pub fn is_status_revoked(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("revoked")
     }
-    pub fn termsOfServiceAgreed(&self) -> bool {
-        self.termsOfServiceAgreed.unwrap_or(false)
+
+    pub fn terms_of_service_agreed(&self) -> bool {
+        self.terms_of_service_agreed.unwrap_or(false)
     }
 }
 
@@ -169,15 +171,16 @@ impl ApiAccount {
 //   ],
 //   "finalize": "https://example.com/acme/finalize/7738992/18234324"
 // }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ApiOrder {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires: Option<String>,
     pub identifiers: Vec<ApiIdentifier>,
-    pub notBefore: Option<String>,
-    pub notAfter: Option<String>,
+    pub not_before: Option<String>,
+    pub not_after: Option<String>,
     pub error: Option<ApiProblem>,
     pub authorizations: Option<Vec<String>>,
     pub finalize: String,
@@ -189,23 +192,28 @@ impl ApiOrder {
     pub fn is_status_pending(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("pending")
     }
+
     /// When all authorizations are finished, and we need to call
     /// "finalize".
     pub fn is_status_ready(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("ready")
     }
+
     /// On "finalize" the server is processing to sign CSR.
     pub fn is_status_processing(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("processing")
     }
+
     /// Once the certificate is issued and can be downloaded.
     pub fn is_status_valid(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("valid")
     }
+
     /// If the order failed and can't be used again.
     pub fn is_status_invalid(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("invalid")
     }
+
     /// Return all domains
     pub fn domains(&self) -> Vec<&str> {
         self.identifiers.iter().map(|i| i.value.as_ref()).collect()
@@ -355,7 +363,7 @@ pub struct ApiRevocation {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]

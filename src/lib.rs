@@ -166,7 +166,6 @@ mod error;
 mod jwt;
 mod req;
 mod trans;
-mod util;
 
 pub mod api;
 pub mod order;
