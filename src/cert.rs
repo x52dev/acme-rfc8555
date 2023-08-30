@@ -10,8 +10,7 @@ use x509_cert::{
     ext::pkix::{name::GeneralName, SubjectAltName},
     name::Name,
 };
-
-use crate::error::Result;
+use zeroize::Zeroizing;
 
 /// Make an RSA private key (from which we can derive a public key).
 ///
@@ -57,38 +56,40 @@ pub(crate) fn create_csr(
 /// Encapsulated certificate and private key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Certificate {
-    private_key: String,
+    signing_key_pem: Zeroizing<String>,
     certificate: String,
 }
 
 impl Certificate {
-    pub(crate) fn new(private_key: String, certificate: String) -> Self {
+    pub(crate) fn new(signing_key_pem: Zeroizing<String>, certificate: String) -> Self {
         Certificate {
-            private_key,
+            signing_key_pem,
             certificate,
         }
     }
 
-    pub fn parse(private_key: String, certificate: String) -> Result<Self> {
+    pub fn parse(signing_key_pem: Zeroizing<String>, certificate: String) -> anyhow::Result<Self> {
         // validate certificate
         x509_cert::Certificate::from_pem(certificate.as_bytes())?;
+
         // validate private key
-        ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&private_key)?;
+        ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&signing_key_pem)?;
 
         Ok(Certificate {
-            private_key,
+            signing_key_pem,
             certificate,
         })
     }
 
     /// The PEM encoded private key.
     pub fn private_key(&self) -> &str {
-        &self.private_key
+        &self.signing_key_pem
     }
 
     /// The private key as DER.
     pub fn private_key_der(&self) -> anyhow::Result<Vec<u8>> {
-        let signing_key = ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&self.private_key)?;
+        let signing_key =
+            ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&self.signing_key_pem)?;
         let der = signing_key.to_pkcs8_der()?;
         Ok(der.as_bytes().to_vec())
     }
@@ -111,7 +112,7 @@ impl Certificate {
     /// issued cert, since it counts _whole_ days.
     ///
     /// It is possible to get negative days for an expired certificate.
-    pub fn valid_days_left(&self) -> Result<i64> {
+    pub fn valid_days_left(&self) -> anyhow::Result<i64> {
         // the cert used in the tests is not valid to load as x509
         if cfg!(test) {
             return Ok(89);

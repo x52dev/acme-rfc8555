@@ -115,7 +115,7 @@ fn post_get_order(url: &str) -> Response<Body> {
     "finalize": "<URL>/acme/finalize/7738992/18234324",
     "certificate": "<URL>/acme/cert/fae41c070f967713109028"
     }"#;
-    let b = RE_URL.replace_all(BODY, url).to_string();
+    let b = RE_URL.replace_all(BODY, url).into_owned();
     Response::builder().status(200).body(Body::from(b)).unwrap()
 }
 

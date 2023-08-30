@@ -6,7 +6,6 @@ use zeroize::Zeroizing;
 use crate::{
     api::{ApiAccount, ApiDirectory, ApiIdentifier, ApiOrder, ApiRevocation},
     cert::Certificate,
-    error::Result,
     order::{NewOrder, Order},
     req::req_expect_header,
     trans::Transport,
@@ -60,7 +59,7 @@ impl Account {
     /// Private key for this account.
     ///
     /// The key is an elliptic curve private key.
-    pub fn acme_private_key_pem(&self) -> Result<Zeroizing<String>> {
+    pub fn acme_private_key_pem(&self) -> anyhow::Result<Zeroizing<String>> {
         self.inner.transport.acme_key().to_pem()
     }
 
@@ -76,15 +75,19 @@ impl Account {
     /// names supplied are exactly the same.
     ///
     /// [100 names]: https://letsencrypt.org/docs/rate-limits/
-    pub async fn new_order(&self, primary_name: &str, alt_names: &[&str]) -> Result<NewOrder> {
+    pub async fn new_order(
+        &self,
+        primary_name: &str,
+        alt_names: &[&str],
+    ) -> anyhow::Result<NewOrder> {
         // construct the identifiers
         let prim_arr = [primary_name];
         let domains = prim_arr.iter().chain(alt_names);
         let order = ApiOrder {
             identifiers: domains
-                .map(|s| ApiIdentifier {
-                    _type: "dns".into(),
-                    value: s.to_string(),
+                .map(|&domain| ApiIdentifier {
+                    _type: "dns".to_owned(),
+                    value: domain.to_owned(),
                 })
                 .collect(),
             ..Default::default()
@@ -105,7 +108,7 @@ impl Account {
         &self,
         cert: &Certificate,
         reason: RevocationReason,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         // convert to base64url of the DER (which is not PEM).
         let certificate = BASE64_URL_SAFE_NO_PAD.encode(cert.certificate_der()?);
 
@@ -145,18 +148,20 @@ pub enum RevocationReason {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{Directory, DirectoryUrl};
 
     #[tokio::test]
-    async fn test_create_order() -> Result<()> {
+    async fn test_create_order() {
         let server = crate::test::with_directory_server();
+
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await?;
+        let dir = Directory::from_url(url).await.unwrap();
+
         let acc = dir
-            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
-            .await?;
-        let _ = acc.new_order("acmetest.example.com", &[]).await?;
-        Ok(())
+            .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
+            .await
+            .unwrap();
+
+        let _order = acc.new_order("acmetest.example.com", &[]).await.unwrap();
     }
 }

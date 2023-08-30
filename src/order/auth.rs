@@ -7,7 +7,6 @@ use sha2::{Digest as _, Sha256};
 use crate::{
     acc::{AccountInner, AcmeKey},
     api::{ApiAuth, ApiChallenge, ApiEmptyObject, ApiEmptyString},
-    error::Result,
     jwt::{Jwk, JwkThumb},
 };
 
@@ -176,7 +175,7 @@ impl Challenge<Http> {
     }
 
     /// The `proof` is some text content that is placed in the file named by `token`.
-    pub fn http_proof(&self) -> Result<String> {
+    pub fn http_proof(&self) -> anyhow::Result<String> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
         Ok(proof)
@@ -189,7 +188,7 @@ impl Challenge<Dns> {
     /// ```text
     /// _acme-challenge.<domain-to-be-proven>.  TXT  <proof>
     /// ```
-    pub fn dns_proof(&self) -> Result<String> {
+    pub fn dns_proof(&self) -> anyhow::Result<String> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, true)?;
         Ok(proof)
@@ -199,7 +198,7 @@ impl Challenge<Dns> {
 impl Challenge<TlsAlpn> {
     /// The `proof` is the contents of the ACME extension to be placed in the
     /// certificate used for validation.
-    pub fn tls_alpn_proof(&self) -> Result<[u8; 32]> {
+    pub fn tls_alpn_proof(&self) -> anyhow::Result<[u8; 32]> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
         Ok(Sha256::digest(proof.as_bytes()).try_into().unwrap())
@@ -226,14 +225,14 @@ impl<A> Challenge<A> {
     ///
     /// The user must first update the DNS record or HTTP web server depending
     /// on the type challenge being validated.
-    pub async fn validate(&self, delay: Duration) -> Result<()> {
+    pub async fn validate(&self, delay: Duration) -> anyhow::Result<()> {
         let res = self
             .inner
             .transport
             .call(&self.api_challenge.url, &ApiEmptyObject)
             .await?;
 
-        let _ = res.json::<ApiChallenge>().await?;
+        let _api_challenge = res.json::<ApiChallenge>().await?;
 
         let auth = wait_for_auth_status(&self.inner, &self.auth_url, delay).await?;
 
@@ -265,17 +264,20 @@ impl<A> Challenge<A> {
     }
 }
 
-fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> Result<String> {
+fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> anyhow::Result<String> {
     let jwk = Jwk::try_from(key)?;
     let jwk_thumb = JwkThumb::from(&jwk);
     let jwk_json = serde_json::to_string(&jwk_thumb)?;
+
     let digest = BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(jwk_json.as_bytes()));
     let key_auth = format!("{token}.{digest}");
+
     let res = if extra_sha256 {
         BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(key_auth.as_bytes()))
     } else {
         key_auth
     };
+
     Ok(res)
 }
 
@@ -283,7 +285,7 @@ async fn wait_for_auth_status(
     inner: &Arc<AccountInner>,
     auth_url: &str,
     delay: Duration,
-) -> Result<ApiAuth> {
+) -> anyhow::Result<ApiAuth> {
     let auth = loop {
         let res = inner.transport.call(auth_url, &ApiEmptyString).await?;
         let auth = res.json::<ApiAuth>().await?;
@@ -292,6 +294,7 @@ async fn wait_for_auth_status(
         }
         thread::sleep(delay);
     };
+
     Ok(auth)
 }
 
@@ -300,15 +303,16 @@ mod tests {
     use crate::*;
 
     #[tokio::test]
-    async fn test_get_challenges() -> Result<()> {
+    async fn test_get_challenges() {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await?;
+        let dir = Directory::from_url(url).await.unwrap();
         let acc = dir
-            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
-            .await?;
-        let ord = acc.new_order("acmetest.example.com", &[]).await?;
-        let authz = ord.authorizations().await?;
+            .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
+            .await
+            .unwrap();
+        let ord = acc.new_order("acmetest.example.com", &[]).await.unwrap();
+        let authz = ord.authorizations().await.unwrap();
         assert!(authz.len() == 1);
         let auth = &authz[0];
 
@@ -317,7 +321,5 @@ mod tests {
 
         let dns = auth.dns_challenge().unwrap();
         assert!(dns.need_validate());
-
-        Ok(())
     }
 }

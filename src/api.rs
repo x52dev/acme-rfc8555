@@ -9,8 +9,6 @@ use serde::{
     Deserialize, Serialize,
 };
 
-use crate::error::Result;
-
 /// Serializes to `""`
 pub struct ApiEmptyString;
 

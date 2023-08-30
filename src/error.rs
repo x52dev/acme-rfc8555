@@ -1,9 +1,9 @@
-pub use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{anyhow, Error};
 
 use crate::api::ApiProblem;
 
 impl From<ApiProblem> for Error {
-    fn from(x: ApiProblem) -> Error {
-        anyhow!("{}", x)
+    fn from(err: ApiProblem) -> Error {
+        anyhow!("{err}")
     }
 }

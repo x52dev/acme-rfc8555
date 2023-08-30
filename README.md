@@ -22,7 +22,7 @@ let url = DirectoryUrl::LetsEncrypt;
 let dir = Directory::from_url(url).await?;
 
 // Your contact addresses, note the `mailto:`
-let contact = vec!["mailto:foo@bar.com".to_string()];
+let contact = vec!["mailto:foo@bar.com".to_owned()];
 
 // Generate a private key and register an account with your ACME provider.
 // You should write it to disk any use `load_account` afterwards.

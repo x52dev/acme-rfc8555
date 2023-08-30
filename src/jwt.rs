@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{acc::AcmeKey, Result};
+use crate::acc::AcmeKey;
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub(crate) struct JwsProtected {
@@ -58,8 +58,9 @@ pub(crate) struct JwkThumb {
 }
 
 impl TryFrom<&AcmeKey> for Jwk {
-    type Error = crate::Error;
-    fn try_from(a: &AcmeKey) -> Result<Self> {
+    type Error = anyhow::Error;
+
+    fn try_from(a: &AcmeKey) -> anyhow::Result<Self> {
         let point = a.signing_key().verifying_key().to_encoded_point(false);
 
         let x = point.x().unwrap();

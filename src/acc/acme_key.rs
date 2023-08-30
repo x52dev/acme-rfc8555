@@ -2,8 +2,6 @@ use anyhow::Context as _;
 use pkcs8::{DecodePrivateKey as _, EncodePrivateKey as _};
 use zeroize::Zeroizing;
 
-use crate::error::Result;
-
 #[derive(Clone, Debug)]
 pub(crate) struct AcmeKey {
     signing_key: p256::ecdsa::SigningKey,
@@ -17,7 +15,7 @@ impl AcmeKey {
         Self::from_key(crate::create_p256_key())
     }
 
-    pub(crate) fn from_pem(pem: &str) -> Result<AcmeKey> {
+    pub(crate) fn from_pem(pem: &str) -> anyhow::Result<AcmeKey> {
         let pri_key = ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(pem)
             .context("Failed to read PEM")?;
         Ok(Self::from_key(pri_key))
@@ -30,7 +28,7 @@ impl AcmeKey {
         }
     }
 
-    pub(crate) fn to_pem(&self) -> Result<Zeroizing<String>> {
+    pub(crate) fn to_pem(&self) -> anyhow::Result<Zeroizing<String>> {
         self.signing_key
             .to_pkcs8_pem(pem::LineEnding::LF)
             .context("private_key_to_pem")

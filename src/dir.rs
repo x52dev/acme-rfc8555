@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::{
     acc::AcmeKey,
     api::{ApiAccount, ApiDirectory},
-    error::Result,
     req::{req_expect_header, req_get, req_handle_error},
     trans::{NoncePool, Transport},
     Account,
@@ -17,10 +16,12 @@ const LETSENCRYPT_STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/
 pub enum DirectoryUrl<'a> {
     /// The main Let's Encrypt directory. Not appropriate for testing and dev.
     LetsEncrypt,
+
     /// The staging Let's Encrypt directory. Use for testing and dev. Doesn't issue
     /// "valid" certificates. The root signing certificate is not supposed
     /// to be in any trust chains.
     LetsEncryptStaging,
+
     /// Provide an arbitrary director URL to connect to.
     Other(&'a str),
 }
@@ -44,7 +45,7 @@ pub struct Directory {
 
 impl Directory {
     /// Create a directory over a persistence implementation and directory url.
-    pub async fn from_url(url: DirectoryUrl<'_>) -> Result<Directory> {
+    pub async fn from_url(url: DirectoryUrl<'_>) -> anyhow::Result<Directory> {
         let dir_url = url.to_url();
         let res = req_handle_error(req_get(dir_url).await).await?;
         let api_directory = res.json::<ApiDirectory>().await?;
@@ -55,12 +56,16 @@ impl Directory {
         })
     }
 
-    pub async fn register_account(&self, contact: Option<Vec<String>>) -> Result<Account> {
+    pub async fn register_account(&self, contact: Option<Vec<String>>) -> anyhow::Result<Account> {
         let acme_key = AcmeKey::new();
         self.upsert_account(acme_key, contact).await
     }
 
-    pub async fn load_account(&self, pem: &str, contact: Option<Vec<String>>) -> Result<Account> {
+    pub async fn load_account(
+        &self,
+        pem: &str,
+        contact: Option<Vec<String>>,
+    ) -> anyhow::Result<Account> {
         let acme_key = AcmeKey::from_pem(pem)?;
         self.upsert_account(acme_key, contact).await
     }
@@ -69,7 +74,7 @@ impl Directory {
         &self,
         acme_key: AcmeKey,
         contact: Option<Vec<String>>,
-    ) -> Result<Account> {
+    ) -> anyhow::Result<Account> {
         // Prepare making a call to newAccount. This is fine to do both for
         // new keys and existing. For existing the spec says to return a 200
         // with the Location header set to the key id (kid).
@@ -109,26 +114,28 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_create_directory() -> Result<()> {
+    async fn test_create_directory() {
         let server = crate::test::with_directory_server();
+
         let url = DirectoryUrl::Other(&server.dir_url);
-        let _ = Directory::from_url(url).await?;
-        Ok(())
+        let _dir = Directory::from_url(url).await.unwrap();
     }
 
     #[tokio::test]
-    async fn test_create_account() -> Result<()> {
+    async fn test_create_account() {
         let server = crate::test::with_directory_server();
+
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await?;
-        let _ = dir
-            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
-            .await?;
-        Ok(())
+        let dir = Directory::from_url(url).await.unwrap();
+
+        let _acc = dir
+            .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
+            .await
+            .unwrap();
     }
 
     // #[test]
-    // fn test_the_whole_hog() -> Result<()> {
+    // fn test_the_whole_hog() {
     //     std::env::set_var("RUST_LOG", "acme_lite=trace");
     //     let _ = env_logger::try_init();
 

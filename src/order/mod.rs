@@ -30,11 +30,9 @@ use crate::{
     acc::AccountInner,
     api::{ApiAuth, ApiEmptyString, ApiFinalize, ApiOrder},
     cert::{create_csr, Certificate},
-    error::Result,
 };
 
 mod auth;
-
 pub use self::auth::{Auth, Challenge};
 
 /// The order wrapped with an outer façade.
@@ -59,7 +57,7 @@ pub(crate) async fn refresh_order(
     inner: &Arc<AccountInner>,
     url: String,
     want_status: &'static str,
-) -> Result<Order> {
+) -> anyhow::Result<Order> {
     let res = inner.transport.call(&url, &ApiEmptyString).await?;
 
     // our test rig requires the order to be in `want_status`.
@@ -74,17 +72,17 @@ pub(crate) async fn refresh_order(
 }
 
 #[cfg(not(test))]
-async fn api_order_of(res: reqwest::Response, _want_status: &str) -> Result<ApiOrder> {
+async fn api_order_of(res: reqwest::Response, _want_status: &str) -> anyhow::Result<ApiOrder> {
     Ok(res.json().await?)
 }
 
 #[cfg(test)]
 // our test rig requires the order to be in `want_status`
-async fn api_order_of(res: reqwest::Response, want_status: &str) -> Result<ApiOrder> {
+async fn api_order_of(res: reqwest::Response, want_status: &str) -> anyhow::Result<ApiOrder> {
     let s = res.text().await?;
     #[allow(clippy::trivial_regex)]
     let re = regex::Regex::new("<STATUS>").unwrap();
-    let b = re.replace_all(&s, want_status).to_string();
+    let b = re.replace_all(&s, want_status).into_owned();
     let api_order: ApiOrder = serde_json::from_str(&b)?;
     Ok(api_order)
 }
@@ -145,7 +143,7 @@ impl NewOrder {
     /// Refresh the order state against the ACME API.
     ///
     /// The specification calls this a "POST-as-GET" against the order URL.
-    pub async fn refresh(&mut self) -> Result<()> {
+    pub async fn refresh(&mut self) -> anyhow::Result<()> {
         let order = refresh_order(&self.order.inner, self.order.url.clone(), "ready").await?;
         self.order = order;
         Ok(())
@@ -157,7 +155,7 @@ impl NewOrder {
     ///
     /// If the order includes new domain names that have not been authorized before, this
     /// list might contain a mix of already valid and not yet valid auths.
-    pub async fn authorizations(&self) -> Result<Vec<Auth>> {
+    pub async fn authorizations(&self) -> anyhow::Result<Vec<Auth>> {
         let mut result = vec![];
         if let Some(authorizations) = &self.order.api_order.authorizations {
             for auth_url in authorizations {
@@ -214,7 +212,11 @@ impl CsrOrder {
     /// This is a convenience wrapper that in turn calls the lower level [`finalize_signing_key`].
     ///
     /// [`finalize_signing_key`]: struct.CsrOrder.html#method.finalize_signing_key
-    pub async fn finalize(self, private_key_pem: &str, delay: Duration) -> Result<CertOrder> {
+    pub async fn finalize(
+        self,
+        private_key_pem: &str,
+        delay: Duration,
+    ) -> anyhow::Result<CertOrder> {
         let signing_key =
             SigningKey::from_pkcs8_pem(private_key_pem).context("Error reading private key PEM")?;
         self.finalize_signing_key(signing_key, delay).await
@@ -231,7 +233,7 @@ impl CsrOrder {
         self,
         signing_key: p256::ecdsa::SigningKey,
         delay: Duration,
-    ) -> Result<CertOrder> {
+    ) -> anyhow::Result<CertOrder> {
         // the domains that we have authorized
         let domains = self.order.api_order.domains();
 
@@ -273,9 +275,9 @@ async fn wait_for_order_status(
     inner: &Arc<AccountInner>,
     url: &str,
     delay: Duration,
-) -> Result<Order> {
+) -> anyhow::Result<Order> {
     loop {
-        let order = refresh_order(inner, url.to_string(), "valid").await?;
+        let order = refresh_order(inner, url.to_owned(), "valid").await?;
         if !order.api_order.is_status_processing() {
             return Ok(order);
         }
@@ -291,7 +293,7 @@ pub struct CertOrder {
 
 impl CertOrder {
     /// Request download of the issued certificate.
-    pub async fn download_cert(self) -> Result<Certificate> {
+    pub async fn download_cert(self) -> anyhow::Result<Certificate> {
         let url = self
             .order
             .api_order
@@ -304,9 +306,9 @@ impl CertOrder {
 
         let signing_key_pem = self.signing_key.to_pkcs8_pem(der::pem::LineEnding::LF)?;
 
-        let cert = res.text().await?;
+        let certificate = res.text().await?;
 
-        Ok(Certificate::new(signing_key_pem.to_string(), cert))
+        Ok(Certificate::new(signing_key_pem, certificate))
     }
 
     /// Access the underlying JSON object for debugging.
@@ -321,58 +323,59 @@ mod tests {
     use crate::{cert, Directory, DirectoryUrl};
 
     #[tokio::test]
-    async fn test_get_authorizations() -> Result<()> {
+    async fn test_get_authorizations() {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await?;
+        let dir = Directory::from_url(url).await.unwrap();
         let acc = dir
-            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
-            .await?;
-        let ord = acc.new_order("acmetest.example.com", &[]).await?;
-        let _ = ord.authorizations().await?;
-        Ok(())
+            .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
+            .await
+            .unwrap();
+        let ord = acc.new_order("acmetest.example.com", &[]).await.unwrap();
+        let _authorizations = ord.authorizations().await.unwrap();
     }
 
     #[tokio::test]
-    async fn test_finalize() -> Result<()> {
+    async fn test_finalize() {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await?;
+        let dir = Directory::from_url(url).await.unwrap();
         let acc = dir
-            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
-            .await?;
-        let ord = acc.new_order("acmetest.example.com", &[]).await?;
+            .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
+            .await
+            .unwrap();
+        let ord = acc.new_order("acmetest.example.com", &[]).await.unwrap();
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
         let signing_key = cert::create_p256_key();
         let _ord = ord
             .finalize_signing_key(signing_key, Duration::from_millis(1))
-            .await?;
-        Ok(())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
-    async fn test_download_and_save_cert() -> Result<()> {
+    async fn test_download_and_save_cert() {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await?;
+        let dir = Directory::from_url(url).await.unwrap();
         let acc = dir
-            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
-            .await?;
-        let ord = acc.new_order("acmetest.example.com", &[]).await?;
+            .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
+            .await
+            .unwrap();
+        let ord = acc.new_order("acmetest.example.com", &[]).await.unwrap();
 
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
         let signing_key = cert::create_p256_key();
         let ord = ord
             .finalize_signing_key(signing_key, Duration::from_millis(1))
-            .await?;
+            .await
+            .unwrap();
 
-        let cert = ord.download_cert().await?;
+        let cert = ord.download_cert().await.unwrap();
         assert_eq!("CERT HERE", cert.certificate());
         assert!(!cert.private_key().is_empty());
-        assert_eq!(cert.valid_days_left()?, 89);
-
-        Ok(())
+        assert_eq!(cert.valid_days_left().unwrap(), 89);
     }
 }

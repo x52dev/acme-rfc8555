@@ -10,7 +10,6 @@ use sha2::Digest as _;
 
 use crate::{
     acc::AcmeKey,
-    error::Result,
     jwt::{Jwk, Jws, JwsProtected},
     req::{req_expect_header, req_handle_error, req_head, req_post},
 };
@@ -48,29 +47,31 @@ impl Transport {
     }
 
     /// Make call using the full jwk. Only for the first newAccount request.
-    pub async fn call_jwk<T: Serialize + ?Sized>(
-        &self,
-        url: &str,
-        body: &T,
-    ) -> Result<reqwest::Response> {
+    pub async fn call_jwk<T>(&self, url: &str, body: &T) -> anyhow::Result<reqwest::Response>
+    where
+        T: Serialize + ?Sized,
+    {
         self.do_call(url, body, jws_with_jwk).await
     }
 
     /// Make call using the key id
-    pub async fn call<T: Serialize + ?Sized>(
-        &self,
-        url: &str,
-        body: &T,
-    ) -> Result<reqwest::Response> {
+    pub async fn call<T>(&self, url: &str, body: &T) -> anyhow::Result<reqwest::Response>
+    where
+        T: Serialize + ?Sized,
+    {
         self.do_call(url, body, jws_with_kid).await
     }
 
-    async fn do_call<T: Serialize + ?Sized, F: Fn(&str, String, &AcmeKey, &T) -> Result<String>>(
+    async fn do_call<T, F>(
         &self,
         url: &str,
         body: &T,
         make_body: F,
-    ) -> Result<reqwest::Response> {
+    ) -> anyhow::Result<reqwest::Response>
+    where
+        T: Serialize + ?Sized,
+        F: Fn(&str, String, &AcmeKey, &T) -> anyhow::Result<String>,
+    {
         // The ACME API may at any point invalidate all nonces. If we detect such an
         // error, we loop until the server accepts the nonce.
         loop {
@@ -136,7 +137,7 @@ impl NoncePool {
         }
     }
 
-    async fn get_nonce(&self) -> Result<String> {
+    async fn get_nonce(&self) -> anyhow::Result<String> {
         {
             let mut pool = self.pool.lock().unwrap();
             if let Some(nonce) = pool.pop_front() {
@@ -155,7 +156,7 @@ fn jws_with_kid<T: Serialize + ?Sized>(
     nonce: String,
     key: &AcmeKey,
     payload: &T,
-) -> Result<String> {
+) -> anyhow::Result<String> {
     let protected = JwsProtected::new_kid(key.key_id(), url, nonce);
     jws_with(protected, key, payload)
 }
@@ -165,7 +166,7 @@ fn jws_with_jwk<T: Serialize + ?Sized>(
     nonce: String,
     key: &AcmeKey,
     payload: &T,
-) -> Result<String> {
+) -> anyhow::Result<String> {
     let jwk: Jwk = key.try_into()?;
     let protected = JwsProtected::new_jwk(jwk, url, nonce);
     jws_with(protected, key, payload)
@@ -175,7 +176,7 @@ fn jws_with<T: Serialize + ?Sized>(
     protected: JwsProtected,
     key: &AcmeKey,
     payload: &T,
-) -> Result<String> {
+) -> anyhow::Result<String> {
     let protected = {
         let pro_json = serde_json::to_string(&protected)?;
         BASE64_URL_SAFE_NO_PAD.encode(pro_json.as_bytes())
@@ -185,7 +186,7 @@ fn jws_with<T: Serialize + ?Sized>(
         if pay_json == "\"\"" {
             // This is a special case produced by ApiEmptyString and should
             // not be further base64url encoded.
-            "".to_string()
+            String::new()
         } else {
             BASE64_URL_SAFE_NO_PAD.encode(pay_json.as_bytes())
         }

@@ -21,7 +21,7 @@
 //! let dir = Directory::from_url(url).await?;
 //!
 //! // Your contact addresses, note the `mailto:`
-//! let contact = vec!["mailto:foo@bar.com".to_string()];
+//! let contact = vec!["mailto:foo@bar.com".to_owned()];
 //!
 //! // Generate a private key and register an account with your ACME provider.
 //! // You should write it to disk any use `load_account` afterwards.
@@ -177,5 +177,4 @@ pub use crate::{
     acc::{Account, RevocationReason},
     cert::{create_p256_key, create_p384_key, create_rsa_key, Certificate},
     dir::{Directory, DirectoryUrl},
-    error::{Error, Result},
 };
