@@ -25,17 +25,18 @@ p384 = { version = "0.13", features = ["pkcs8", "ecdsa-core"] }
 pem-rfc7468 = "0.7"
 pkcs8 = "0.10"
 rand = "0.8"
+reqwest = { version = "0.11", features = ["json"] }
 rsa = "0.9"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = { version = "0.10.6", features = ["oid"] }
 time = "0.3"
-ureq = "2"
 x509-cert = { version = "0.2.4", features = ["pem", "builder"] }
 zeroize = "1"
 
 [dev-dependencies]
 doc-comment = "0.3"
-futures = "0.1.25"
-hyper = "0.12"
+futures-util = { version = "0.3.17", default-features = false, features = ["std"] }
+hyper = { version = "0.14", features = ["server", "tcp", "http1"] }
 regex = "1.4"
+tokio = { version = "1.24.2", features = ["sync", "rt", "macros"] }

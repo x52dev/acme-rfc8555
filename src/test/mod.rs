@@ -1,16 +1,17 @@
 #![allow(clippy::trivial_regex)]
 
-use std::{net::TcpListener, thread};
+use std::convert::Infallible;
+use std::net::TcpListener;
 
-use futures::Future;
-use hyper::{service::service_fn_ok, Body, Method, Request, Response, Server};
+use hyper::service::make_service_fn;
+use hyper::{service::service_fn, Body, Method, Request, Response, Server};
 use once_cell::sync::Lazy;
 
 static RE_URL: Lazy<regex::Regex> = Lazy::new(|| regex::Regex::new("<URL>").unwrap());
 
 pub struct TestServer {
     pub dir_url: String,
-    shutdown: Option<futures::sync::oneshot::Sender<()>>,
+    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 impl Drop for TestServer {
@@ -182,23 +183,29 @@ pub fn with_directory_server() -> TestServer {
     let port = tcp.local_addr().unwrap().port();
 
     let url = format!("http://127.0.0.1:{}", port);
-    let dir_url = format!("{}/directory", url);
+    let dir_url = format!("{url}/directory");
 
-    let make_service = move || {
-        let url2 = url.clone();
-        service_fn_ok(move |req| route_request(req, &url2))
-    };
-    let server = Server::from_tcp(tcp).unwrap().serve(make_service);
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
 
-    let (tx, rx) = futures::sync::oneshot::channel::<()>();
-
-    let graceful = server
-        .with_graceful_shutdown(rx)
-        .map_err(|err| eprintln!("server error: {}", err));
-
-    thread::spawn(move || {
-        hyper::rt::run(graceful);
+    let make_service = make_service_fn(move |_| {
+        let url = url.clone();
+        async move {
+            let url = url.clone();
+            hyper::Result::Ok(service_fn(move |req| {
+                let url = url.clone();
+                async move { Ok::<_, Infallible>(route_request(req, &url)) }
+            }))
+        }
     });
+
+    let server = Server::from_tcp(tcp)
+        .unwrap()
+        .serve(make_service)
+        .with_graceful_shutdown(async {
+            rx.await.ok();
+        });
+
+    tokio::spawn(server);
 
     TestServer {
         dir_url,
@@ -206,9 +213,9 @@ pub fn with_directory_server() -> TestServer {
     }
 }
 
-#[test]
-pub fn test_make_directory() {
+#[tokio::test]
+pub async fn test_make_directory() {
     let server = with_directory_server();
-    let res = ureq::get(&server.dir_url).call().unwrap();
-    assert!((200..=299).contains(&res.status()));
+    let res = reqwest::get(&server.dir_url).await.unwrap();
+    assert!(res.status().is_success());
 }

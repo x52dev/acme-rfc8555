@@ -48,26 +48,34 @@ impl Transport {
     }
 
     /// Make call using the full jwk. Only for the first newAccount request.
-    pub fn call_jwk<T: Serialize + ?Sized>(&self, url: &str, body: &T) -> Result<ureq::Response> {
-        self.do_call(url, body, jws_with_jwk)
+    pub async fn call_jwk<T: Serialize + ?Sized>(
+        &self,
+        url: &str,
+        body: &T,
+    ) -> Result<reqwest::Response> {
+        self.do_call(url, body, jws_with_jwk).await
     }
 
     /// Make call using the key id
-    pub fn call<T: Serialize + ?Sized>(&self, url: &str, body: &T) -> Result<ureq::Response> {
-        self.do_call(url, body, jws_with_kid)
+    pub async fn call<T: Serialize + ?Sized>(
+        &self,
+        url: &str,
+        body: &T,
+    ) -> Result<reqwest::Response> {
+        self.do_call(url, body, jws_with_kid).await
     }
 
-    fn do_call<T: Serialize + ?Sized, F: Fn(&str, String, &AcmeKey, &T) -> Result<String>>(
+    async fn do_call<T: Serialize + ?Sized, F: Fn(&str, String, &AcmeKey, &T) -> Result<String>>(
         &self,
         url: &str,
         body: &T,
         make_body: F,
-    ) -> Result<ureq::Response> {
+    ) -> Result<reqwest::Response> {
         // The ACME API may at any point invalidate all nonces. If we detect such an
         // error, we loop until the server accepts the nonce.
         loop {
             // Either get a new nonce, or reuse one from a previous request.
-            let nonce = self.nonce_pool.get_nonce()?;
+            let nonce = self.nonce_pool.get_nonce().await?;
 
             // Sign the body.
             let body = make_body(url, nonce, &self.acme_key, body)?;
@@ -75,14 +83,14 @@ impl Transport {
             log::debug!("Call endpoint {}", url);
 
             // Post it to the URL
-            let response = req_post(url, &body);
+            let response = req_post(url, &body).await;
 
             // Regardless of the request being a success or not, there might be
             // a nonce in the response.
             self.nonce_pool.extract_nonce(&response);
 
             // Turn errors into ApiProblem.
-            let result = req_handle_error(response);
+            let result = req_handle_error(response).await;
 
             if let Err(problem) = &result {
                 if problem.is_bad_nonce() {
@@ -117,18 +125,18 @@ impl NoncePool {
         }
     }
 
-    fn extract_nonce(&self, res: &ureq::Response) {
-        if let Some(nonce) = res.header("replay-nonce") {
+    fn extract_nonce(&self, res: &reqwest::Response) {
+        if let Some(nonce) = res.headers().get("replay-nonce") {
             log::trace!("Extract nonce");
             let mut pool = self.pool.lock().unwrap();
-            pool.push_back(nonce.to_string());
+            pool.push_back(nonce.to_str().unwrap().to_owned());
             if pool.len() > 10 {
                 pool.pop_front();
             }
         }
     }
 
-    fn get_nonce(&self) -> Result<String> {
+    async fn get_nonce(&self) -> Result<String> {
         {
             let mut pool = self.pool.lock().unwrap();
             if let Some(nonce) = pool.pop_front() {
@@ -137,7 +145,7 @@ impl NoncePool {
             }
         }
         log::debug!("Request new nonce");
-        let res = req_head(&self.nonce_url);
+        let res = req_head(&self.nonce_url).await;
         Ok(req_expect_header(&res, "replay-nonce")?)
     }
 }

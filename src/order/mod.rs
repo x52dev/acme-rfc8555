@@ -54,16 +54,16 @@ impl Order {
 }
 
 /// Helper to refresh an order status (POST-as-GET).
-pub(crate) fn refresh_order(
+pub(crate) async fn refresh_order(
     inner: &Arc<AccountInner>,
     url: String,
     want_status: &'static str,
 ) -> Result<Order> {
-    let res = inner.transport.call(&url, &ApiEmptyString)?;
+    let res = inner.transport.call(&url, &ApiEmptyString).await?;
 
     // our test rig requires the order to be in `want_status`.
     // api_order_of is different for test compilation
-    let api_order = api_order_of(res, want_status)?;
+    let api_order = api_order_of(res, want_status).await?;
 
     Ok(Order {
         inner: inner.clone(),
@@ -73,14 +73,14 @@ pub(crate) fn refresh_order(
 }
 
 #[cfg(not(test))]
-fn api_order_of(res: ureq::Response, _want_status: &str) -> Result<ApiOrder> {
-    read_json(res)
+async fn api_order_of(res: reqwest::Response, _want_status: &str) -> Result<ApiOrder> {
+    read_json(res).await
 }
 
 #[cfg(test)]
 // our test rig requires the order to be in `want_status`
-fn api_order_of(res: ureq::Response, want_status: &str) -> Result<ApiOrder> {
-    let s = res.into_string()?;
+async fn api_order_of(res: reqwest::Response, want_status: &str) -> Result<ApiOrder> {
+    let s = res.text().await?;
     #[allow(clippy::trivial_regex)]
     let re = regex::Regex::new("<STATUS>").unwrap();
     let b = re.replace_all(&s, want_status).to_string();
@@ -144,8 +144,8 @@ impl NewOrder {
     /// Refresh the order state against the ACME API.
     ///
     /// The specification calls this a "POST-as-GET" against the order URL.
-    pub fn refresh(&mut self) -> Result<()> {
-        let order = refresh_order(&self.order.inner, self.order.url.clone(), "ready")?;
+    pub async fn refresh(&mut self) -> Result<()> {
+        let order = refresh_order(&self.order.inner, self.order.url.clone(), "ready").await?;
         self.order = order;
         Ok(())
     }
@@ -156,12 +156,17 @@ impl NewOrder {
     ///
     /// If the order includes new domain names that have not been authorized before, this
     /// list might contain a mix of already valid and not yet valid auths.
-    pub fn authorizations(&self) -> Result<Vec<Auth>> {
+    pub async fn authorizations(&self) -> Result<Vec<Auth>> {
         let mut result = vec![];
         if let Some(authorizations) = &self.order.api_order.authorizations {
             for auth_url in authorizations {
-                let res = self.order.inner.transport.call(auth_url, &ApiEmptyString)?;
-                let api_auth: ApiAuth = read_json(res)?;
+                let res = self
+                    .order
+                    .inner
+                    .transport
+                    .call(auth_url, &ApiEmptyString)
+                    .await?;
+                let api_auth: ApiAuth = read_json(res).await?;
                 result.push(Auth::new(&self.order.inner, api_auth, auth_url));
             }
         }
@@ -208,10 +213,10 @@ impl CsrOrder {
     /// This is a convenience wrapper that in turn calls the lower level [`finalize_signing_key`].
     ///
     /// [`finalize_signing_key`]: struct.CsrOrder.html#method.finalize_signing_key
-    pub fn finalize(self, private_key_pem: &str, delay: Duration) -> Result<CertOrder> {
+    pub async fn finalize(self, private_key_pem: &str, delay: Duration) -> Result<CertOrder> {
         let signing_key =
             SigningKey::from_pkcs8_pem(private_key_pem).context("Error reading private key PEM")?;
-        self.finalize_signing_key(signing_key, delay)
+        self.finalize_signing_key(signing_key, delay).await
     }
 
     /// Lower level finalize call that works directly with the openssl crate structures.
@@ -221,7 +226,7 @@ impl CsrOrder {
     /// Once the CSR has been submitted, the order goes into a `processing` status,
     /// where we must poll until the status changes. The `delay` is the
     /// amount of time to wait between each poll attempt.
-    pub fn finalize_signing_key(
+    pub async fn finalize_signing_key(
         self,
         signing_key: p256::ecdsa::SigningKey,
         delay: Duration,
@@ -243,12 +248,12 @@ impl CsrOrder {
 
         // if the CSR is invalid, we will get a 4xx code back that
         // bombs out from this retry_call.
-        inner.transport.call(finalize_url, &finalize)?;
+        inner.transport.call(finalize_url, &finalize).await?;
 
         // wait for the status to not be processing.
         // valid -> cert is issued
         // invalid -> the whole thing is off
-        let order = wait_for_order_status(&inner, &order_url, delay)?;
+        let order = wait_for_order_status(&inner, &order_url, delay).await?;
 
         if !order.api_order.is_status_valid() {
             bail!("Order is in status: {:?}", order.api_order.status);
@@ -263,9 +268,13 @@ impl CsrOrder {
     }
 }
 
-fn wait_for_order_status(inner: &Arc<AccountInner>, url: &str, delay: Duration) -> Result<Order> {
+async fn wait_for_order_status(
+    inner: &Arc<AccountInner>,
+    url: &str,
+    delay: Duration,
+) -> Result<Order> {
     loop {
-        let order = refresh_order(inner, url.to_string(), "valid")?;
+        let order = refresh_order(inner, url.to_string(), "valid").await?;
         if !order.api_order.is_status_processing() {
             return Ok(order);
         }
@@ -281,7 +290,7 @@ pub struct CertOrder {
 
 impl CertOrder {
     /// Request download of the issued certificate.
-    pub fn download_cert(self) -> Result<Certificate> {
+    pub async fn download_cert(self) -> Result<Certificate> {
         let url = self
             .order
             .api_order
@@ -290,11 +299,11 @@ impl CertOrder {
 
         let inner = self.order.inner;
 
-        let res = inner.transport.call(&url, &ApiEmptyString)?;
+        let res = inner.transport.call(&url, &ApiEmptyString).await?;
 
         let signing_key_pem = self.signing_key.to_pkcs8_pem(der::pem::LineEnding::LF)?;
 
-        let cert = res.into_string()?;
+        let cert = res.text().await?;
 
         Ok(Certificate::new(signing_key_pem.to_string(), cert))
     }
@@ -310,45 +319,55 @@ mod test {
     use super::*;
     use crate::*;
 
-    #[test]
-    fn test_get_authorizations() -> Result<()> {
+    #[tokio::test]
+    async fn test_get_authorizations() -> Result<()> {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url)?;
-        let acc = dir.register_account(Some(vec!["mailto:foo@bar.com".to_string()]))?;
-        let ord = acc.new_order("acmetest.example.com", &[])?;
-        let _ = ord.authorizations()?;
+        let dir = Directory::from_url(url).await?;
+        let acc = dir
+            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
+            .await?;
+        let ord = acc.new_order("acmetest.example.com", &[]).await?;
+        let _ = ord.authorizations().await?;
         Ok(())
     }
 
-    #[test]
-    fn test_finalize() -> Result<()> {
+    #[tokio::test]
+    async fn test_finalize() -> Result<()> {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url)?;
-        let acc = dir.register_account(Some(vec!["mailto:foo@bar.com".to_string()]))?;
-        let ord = acc.new_order("acmetest.example.com", &[])?;
+        let dir = Directory::from_url(url).await?;
+        let acc = dir
+            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
+            .await?;
+        let ord = acc.new_order("acmetest.example.com", &[]).await?;
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
         let signing_key = cert::create_p256_key();
-        let _ord = ord.finalize_signing_key(signing_key, Duration::from_millis(1))?;
+        let _ord = ord
+            .finalize_signing_key(signing_key, Duration::from_millis(1))
+            .await?;
         Ok(())
     }
 
-    #[test]
-    fn test_download_and_save_cert() -> Result<()> {
+    #[tokio::test]
+    async fn test_download_and_save_cert() -> Result<()> {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url)?;
-        let acc = dir.register_account(Some(vec!["mailto:foo@bar.com".to_string()]))?;
-        let ord = acc.new_order("acmetest.example.com", &[])?;
+        let dir = Directory::from_url(url).await?;
+        let acc = dir
+            .register_account(Some(vec!["mailto:foo@bar.com".to_string()]))
+            .await?;
+        let ord = acc.new_order("acmetest.example.com", &[]).await?;
 
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
         let signing_key = cert::create_p256_key();
-        let ord = ord.finalize_signing_key(signing_key, Duration::from_millis(1))?;
+        let ord = ord
+            .finalize_signing_key(signing_key, Duration::from_millis(1))
+            .await?;
 
-        let cert = ord.download_cert()?;
+        let cert = ord.download_cert().await?;
         assert_eq!("CERT HERE", cert.certificate());
         assert!(!cert.private_key().is_empty());
         assert_eq!(cert.valid_days_left()?, 89);

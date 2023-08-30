@@ -4,46 +4,46 @@ use crate::api::ApiProblem;
 
 pub(crate) type ReqResult<T> = std::result::Result<T, ApiProblem>;
 
-pub(crate) fn req_get(url: &str) -> ureq::Response {
+pub(crate) async fn req_get(url: &str) -> reqwest::Response {
     let client = ureq_agent();
     let req = client.get(url);
     log::trace!("{req:?}");
-    req.call().unwrap()
+    req.send().await.unwrap()
 }
 
-pub(crate) fn req_head(url: &str) -> ureq::Response {
+pub(crate) async fn req_head(url: &str) -> reqwest::Response {
     let client = ureq_agent();
     let req = client.head(url);
     log::trace!("{req:?}");
-    req.call().unwrap()
+    req.send().await.unwrap()
 }
 
-fn ureq_agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_secs(30))
-        .timeout_read(Duration::from_secs(30))
-        .timeout_write(Duration::from_secs(30))
+fn ureq_agent() -> reqwest::Client {
+    reqwest::ClientBuilder::new()
+        .connect_timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(30))
         .build()
+        .unwrap()
 }
 
-pub(crate) fn req_post(url: &str, body: &str) -> ureq::Response {
+pub(crate) async fn req_post(url: &str, body: &str) -> reqwest::Response {
     let client = ureq_agent();
     let req = client
         .post(url)
-        .set("content-type", "application/jose+json");
+        .header("content-type", "application/jose+json");
     log::trace!("{req:?} {body}");
-    req.send_string(body).unwrap()
+    req.body(body.to_owned()).send().await.unwrap()
 }
 
-pub(crate) fn req_handle_error(res: ureq::Response) -> ReqResult<ureq::Response> {
+pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwest::Response> {
     // ok responses pass through
-    if (200..=299).contains(&res.status()) {
+    if res.status().is_success() {
         return Ok(res);
     }
 
-    let problem = if res.content_type() == "application/problem+json" {
+    let problem = if res.headers().get("content-type").unwrap() == "application/problem+json" {
         // if we were sent a problem+json, deserialize it
-        let body = req_safe_read_body(res);
+        let body = req_safe_read_body(res).await;
         serde_json::from_str(&body).unwrap_or_else(|err| ApiProblem {
             _type: "problemJsonFail".into(),
             detail: Some(format!(
@@ -53,8 +53,8 @@ pub(crate) fn req_handle_error(res: ureq::Response) -> ReqResult<ureq::Response>
         })
     } else {
         // some other problem
-        let status = format!("{} {}", res.status(), res.status_text());
-        let body = req_safe_read_body(res);
+        let status = format!("{} {}", res.status(), res.status().as_str());
+        let body = req_safe_read_body(res).await;
         let detail = format!("{} body: {}", status, body);
         ApiProblem {
             _type: "httpReqError".into(),
@@ -66,9 +66,10 @@ pub(crate) fn req_handle_error(res: ureq::Response) -> ReqResult<ureq::Response>
     Err(problem)
 }
 
-pub(crate) fn req_expect_header(res: &ureq::Response, name: &str) -> ReqResult<String> {
-    res.header(name)
-        .map(|v| v.to_string())
+pub(crate) fn req_expect_header(res: &reqwest::Response, name: &str) -> ReqResult<String> {
+    res.headers()
+        .get(name)
+        .map(|v| v.to_str().unwrap().to_owned())
         .ok_or_else(|| ApiProblem {
             _type: format!("Missing header: {}", name),
             detail: None,
@@ -76,12 +77,13 @@ pub(crate) fn req_expect_header(res: &ureq::Response, name: &str) -> ReqResult<S
         })
 }
 
-pub(crate) fn req_safe_read_body(res: ureq::Response) -> String {
-    use std::io::Read;
-    let mut res_body = String::new();
-    let mut read = res.into_reader();
-    // letsencrypt sometimes closes the TLS abruptly causing io error
-    // even though we did capture the body.
-    read.read_to_string(&mut res_body).ok();
-    res_body
+pub(crate) async fn req_safe_read_body(res: reqwest::Response) -> String {
+    res.text().await.unwrap()
+
+    // let mut res_body = String::new();
+    // let mut read = res.text().await.unwrap();
+    // // letsencrypt sometimes closes the TLS abruptly causing io error
+    // // even though we did capture the body.
+    // read.read_to_string(&mut res_body).ok();
+    // res_body
 }
