@@ -9,11 +9,11 @@ Uses ACME v2 to issue/renew certificates.
 ```rust
 use std::time::Duration;
 
-use acme_lite::{Error, Certificate, Directory, DirectoryUrl};
+use acme_lite::{Certificate, Directory, DirectoryUrl};
 use acme_lite::create_p256_key;
 
 #[tokio::main(flavor = "current_thread")]
-async fn request_cert() -> Result<Certificate, Error> {
+async fn request_cert() -> anyhow::Result<Certificate> {
 
 // Use DirectoryUrl::LetsEncryptStaging for dev/testing.
 let url = DirectoryUrl::LetsEncrypt;

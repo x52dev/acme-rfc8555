@@ -7,12 +7,13 @@
 //! # Example
 //!
 //! ```no_run
-//! use acme_lite::{Error, Certificate, Directory, DirectoryUrl};
-//! use acme_lite::create_p384_key;
 //! use std::time::Duration;
 //!
+//! use acme_lite::{Certificate, Directory, DirectoryUrl};
+//! use acme_lite::create_p384_key;
+//!
 //! # #[tokio::test]
-//! async fn request_cert() -> Result<Certificate, Error> {
+//! async fn request_cert() -> anyhow::Result<Certificate> {
 //!
 //! // Use DirectoryUrl::LetsEncryptStaging for dev/testing.
 //! let url = DirectoryUrl::LetsEncrypt;
