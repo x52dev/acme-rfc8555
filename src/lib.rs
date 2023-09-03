@@ -2,7 +2,7 @@
 `acme-lite` is a library for provisioning certificates from ACME (Automatic Certificate
 Management Environment) services such as [Let's Encrypt](https://letsencrypt.org/).
 
-It follows the [RFC 8555](https://datatracker.ietf.org/doc/html/rfc8555) spec, using ACME v2 to
+It follows the [RFC8555](https://datatracker.ietf.org/doc/html/rfc8555) spec, using ACME v2 to
 issue/renew certificates.
 
 # Example
@@ -145,7 +145,7 @@ mod acc;
 mod cert;
 mod dir;
 mod error;
-mod jwt;
+mod jws;
 mod req;
 mod trans;
 

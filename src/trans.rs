@@ -1,16 +1,14 @@
 use std::{
     collections::VecDeque,
-    convert::TryInto,
     sync::{Arc, Mutex},
 };
 
 use base64::prelude::*;
 use serde::Serialize;
-use sha2::Digest as _;
 
 use crate::{
     acc::AcmeKey,
-    jwt::{Jwk, Jws, JwsProtected},
+    jws::{FlattenedJsonJws, Jwk, JwsProtectedHeader},
     req::{req_expect_header, req_handle_error, req_head, req_post},
 };
 
@@ -29,10 +27,10 @@ pub(crate) struct Transport {
 }
 
 impl Transport {
-    pub fn new(nonce_pool: &Arc<NoncePool>, acme_key: AcmeKey) -> Self {
+    pub fn new(nonce_pool: Arc<NoncePool>, acme_key: AcmeKey) -> Self {
         Transport {
             acme_key,
-            nonce_pool: nonce_pool.clone(),
+            nonce_pool,
         }
     }
 
@@ -81,13 +79,13 @@ impl Transport {
             // Sign the body.
             let body = make_body(url, nonce, &self.acme_key, body)?;
 
-            log::debug!("Call endpoint {url}");
+            log::debug!("Call endpoint: {url}");
 
             // Post it to the URL
             let response = req_post(url, &body).await;
 
-            // Regardless of the request being a success or not, there might be
-            // a nonce in the response.
+            // Regardless of the request being a success or not, there might be a nonce in the
+            // response.
             self.nonce_pool.extract_nonce(&response);
 
             // Turn errors into ApiProblem.
@@ -99,6 +97,7 @@ impl Transport {
                     log::debug!("Retrying on bad nonce");
                     continue;
                 }
+
                 // it seems we sometimes make bad JWTs. Why?!
                 if problem.is_jwt_verification_error() {
                     log::debug!("Retrying on: {problem}");
@@ -128,8 +127,10 @@ impl NoncePool {
 
     fn extract_nonce(&self, res: &reqwest::Response) {
         if let Some(nonce) = res.headers().get("replay-nonce") {
-            log::trace!("Extract nonce");
+            log::trace!("Extracting new nonce");
             let mut pool = self.pool.lock().unwrap();
+            // TODO: ignore invalid replay-nonce values
+            // see https://datatracker.ietf.org/doc/html/rfc8555#section-6.5.1
             pool.push_back(nonce.to_str().unwrap().to_owned());
             if pool.len() > 10 {
                 pool.pop_front();
@@ -145,8 +146,12 @@ impl NoncePool {
                 return Ok(nonce);
             }
         }
+
         log::debug!("Request new nonce");
         let res = req_head(&self.nonce_url).await;
+
+        // TODO: ignore invalid replay-nonce values
+        // see https://datatracker.ietf.org/doc/html/rfc8555#section-6.5.1
         Ok(req_expect_header(&res, "replay-nonce")?)
     }
 }
@@ -157,7 +162,7 @@ fn jws_with_kid<T: Serialize + ?Sized>(
     key: &AcmeKey,
     payload: &T,
 ) -> eyre::Result<String> {
-    let protected = JwsProtected::new_kid(key.key_id(), url, nonce);
+    let protected = JwsProtectedHeader::new_kid(key.key_id(), url, nonce);
     jws_with(protected, key, payload)
 }
 
@@ -167,43 +172,45 @@ fn jws_with_jwk<T: Serialize + ?Sized>(
     key: &AcmeKey,
     payload: &T,
 ) -> eyre::Result<String> {
-    let jwk: Jwk = key.try_into()?;
-    let protected = JwsProtected::new_jwk(jwk, url, nonce);
+    let jwk = Jwk::try_from(key)?;
+    let protected = JwsProtectedHeader::new_jwk(jwk, url, nonce);
     jws_with(protected, key, payload)
 }
 
+/// Construct JWS with protected header according to [RFC 7515 §5.1].
+///
+/// [RFC 7515 §5.1]: https://datatracker.ietf.org/doc/html/rfc7515#section-5.1
 fn jws_with<T: Serialize + ?Sized>(
-    protected: JwsProtected,
+    protected: JwsProtectedHeader,
     key: &AcmeKey,
     payload: &T,
 ) -> eyre::Result<String> {
-    let protected = {
+    let header = {
         let pro_json = serde_json::to_string(&protected)?;
-        BASE64_URL_SAFE_NO_PAD.encode(pro_json.as_bytes())
+        BASE64_URL_SAFE_NO_PAD.encode(pro_json)
     };
+
     let payload = {
-        let pay_json = serde_json::to_string(payload)?;
-        if pay_json == "\"\"" {
+        let payload_json = serde_json::to_string(payload)?;
+
+        if payload_json == "\"\"" {
             // This is a special case produced by ApiEmptyString and should
             // not be further base64url encoded.
             String::new()
         } else {
-            BASE64_URL_SAFE_NO_PAD.encode(pay_json.as_bytes())
+            BASE64_URL_SAFE_NO_PAD.encode(payload_json)
         }
     };
 
-    let to_sign = format!("{protected}.{payload}");
-    let digest = sha2::Sha256::digest(to_sign.as_bytes());
-    let (sig, _rec_id) = key.signing_key().sign_recoverable(&digest).unwrap();
-    let r = sig.r().to_bytes().to_vec();
-    let s = sig.s().to_bytes().to_vec();
+    let to_sign = format!("{header}.{payload}");
+    let (signature, _rec_id) = key
+        .signing_key()
+        .sign_recoverable(to_sign.as_bytes())
+        .unwrap();
 
-    let mut v = Vec::with_capacity(r.len() + s.len());
-    v.extend_from_slice(&r);
-    v.extend_from_slice(&s);
-    let signature = BASE64_URL_SAFE_NO_PAD.encode(&v);
+    let signature = BASE64_URL_SAFE_NO_PAD.encode(signature.to_bytes());
 
-    let jws = Jws::new(protected, payload, signature);
+    let jws = FlattenedJsonJws::new(header, payload, signature);
 
     Ok(serde_json::to_string(&jws)?)
 }

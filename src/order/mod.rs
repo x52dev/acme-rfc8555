@@ -18,7 +18,7 @@
 //! [`CsrOrder`]: struct.CsrOrder.html
 //! [`CertOrder`]: struct.CertOrder.html
 
-use std::{sync::Arc, thread, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use base64::prelude::*;
 use der::Encode as _;
@@ -277,10 +277,12 @@ async fn wait_for_order_status(
 ) -> eyre::Result<Order> {
     loop {
         let order = refresh_order(inner, url.to_owned(), "valid").await?;
+
         if !order.api_order.is_status_processing() {
             return Ok(order);
         }
-        thread::sleep(delay);
+
+        tokio::time::sleep(delay).await;
     }
 }
 

@@ -3,6 +3,7 @@
         "actix",
         "alpn",
         "Deque",
+        "HMAC",
         "JWTs",
         "letsencrypt",
         "oneshot",

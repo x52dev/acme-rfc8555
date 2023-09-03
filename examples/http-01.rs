@@ -1,84 +1,91 @@
-use std::fs;
 use std::time::Duration;
 
-use acme_lite::create_p256_key;
-use acme_lite::{Directory, DirectoryUrl};
+use acme_lite::{create_p256_key, Directory, DirectoryUrl};
 use actix_files::Files;
-use actix_web::{App, HttpServer};
+use actix_web::{middleware::Logger, App, HttpServer};
+use tokio::fs;
 
-const PRIMARY_NAME: &str = "example.org";
+const CHALLENGE_DIR: &str = "./acme-challenges";
+const DOMAIN_NAME: &str = "example.org";
+const CONTACT_EMAIL: &str = "contact@example.org";
 
-#[tokio::main(flavor = "current_thread")]
+#[actix_web::main]
 async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    // Use `DirectoryUrl::LetsEncrypt` for production uses.
-    let url = DirectoryUrl::LetsEncryptStaging;
+    log::info!("ensuring challenge dir exists");
+    fs::create_dir_all(CHALLENGE_DIR)
+        .await
+        .expect("should be able to create challenge directory");
 
-    // Create temporary Actix Web server for ACME challenge.
+    log::info!("starting temporary HTTP challenge server");
     let srv = HttpServer::new(|| {
-        App::new().service(
-            Files::new("/.well-known/acme-challenge", "acme-challenge").show_files_listing(),
-        )
+        App::new()
+            .wrap(Logger::default().log_target("acme_http_server"))
+            .service(Files::new("/.well-known/acme-challenge", CHALLENGE_DIR).show_files_listing())
     })
     .bind(("0.0.0.0", 80))?
     .shutdown_timeout(0)
+    .disable_signals()
     .run();
 
     let srv_handle = srv.handle();
     let srv_task = actix_web::rt::spawn(srv);
 
+    log::info!("fetching LetsEncrypt directory");
     // Create a directory entrypoint.
-    let dir = Directory::from_url(url).await?;
+    // Note: Change to `DirectoryUrl::LetsEncrypt` in production.
+    let dir = Directory::from_url(DirectoryUrl::LetsEncryptStaging).await?;
 
     // Your contact addresses, note the `mailto:`
-    let contact = vec!["mailto:foo@bar.com".to_owned()];
+    let contact = vec![format!("mailto:{CONTACT_EMAIL}")];
 
-    // Generate a private key and register an account with your ACME provider.
+    log::info!("generating signing key and registering with ACME provider");
     // You should write it to disk any use `load_account` afterwards.
     let acc = dir.register_account(Some(contact.clone())).await?;
 
-    // Example of how to load an account from string:
+    log::info!("loading account from signing key");
     let signing_key_pem = acc.acme_signing_key_pem()?;
     let acc = dir.load_account(&signing_key_pem, Some(contact)).await?;
 
-    // Order a new TLS certificate for a domain.
-    let mut ord_new = acc.new_order(PRIMARY_NAME, &[]).await?;
+    log::info!("ordering a new TLS certificate for our domain");
+    let mut new_order = acc.new_order(DOMAIN_NAME, &[]).await?;
 
-    // If the ownership of the domain(s) have already been
-    // authorized in a previous order, you might be able to
-    // skip validation. The ACME API provider decides.
+    // If the ownership of the domain(s) have already been authorized in a previous order, you might
+    // be able to skip validation. The ACME API provider decides.
+    log::info!("waiting for certificate signing request to be validated");
     let ord_csr = loop {
-        // are we done?
-        if let Some(ord_csr) = ord_new.confirm_validations() {
+        // Are we done?
+        if let Some(ord_csr) = new_order.confirm_validations() {
+            log::info!("certificate signing request validated");
             break ord_csr;
         }
 
-        // Get the possible authorizations (for a single domain
-        // this will only be one element).
-        let auths = ord_new.authorizations().await?;
+        // Get the possible authorizations (for a single domain this will only be one element).
+        let auths = new_order.authorizations().await?;
+        let auth = &auths[0];
 
-        // For HTTP, the challenge is a text file that needs to
-        // be placed in your web server's root:
+        // For HTTP, the challenge is a text file that needs to be placed in your web server's root:
         //
-        // /<root>/.well-known/acme-challenge/<token>
+        // /.well-known/acme-challenge/<token>
         //
         // The important thing is that it's accessible over the
         // web for the domain(s) you are trying to get a
         // certificate for:
         //
         // http://example.org/.well-known/acme-challenge/<token>
-        let http_challenge = auths[0].http_challenge().unwrap();
+        let http_challenge = auth.http_challenge().unwrap();
 
         // The token is the filename.
         let token = http_challenge.http_token();
-        let path = format!(".well-known/acme-challenge/{token}");
+        let path = format!("{CHALLENGE_DIR}/{token}");
 
         // The proof is the contents of the file.
         let proof = http_challenge.http_proof()?;
 
         // Place the file and contents in the correct place.
-        fs::write(path, proof)?;
+        fs::write(path, proof).await?;
 
         // After the file is accessible from the web, the calls
         // this to tell the ACME API to start checking the
@@ -91,7 +98,7 @@ async fn main() -> eyre::Result<()> {
         http_challenge.validate(Duration::from_millis(5000)).await?;
 
         // Update the state against the ACME API.
-        ord_new.refresh().await?;
+        new_order.refresh().await?;
     };
 
     // Ownership is proven. Create a private key for
@@ -109,14 +116,14 @@ async fn main() -> eyre::Result<()> {
 
     // Finally download the certificate.
     let cert = ord_cert.download_cert().await?;
-    println!("{cert:?}");
+    println!("{}", cert.certificate());
 
     // Stop temporary server for ACME challenge
     srv_handle.stop(true).await;
     srv_task.await??;
 
     // Delete acme-challenge dir
-    fs::remove_dir_all("./acme-challenge")?;
+    fs::remove_dir_all(CHALLENGE_DIR).await?;
 
     Ok(())
 }

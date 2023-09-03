@@ -37,17 +37,20 @@ pub(crate) fn create_csr(
     signer: &p256::ecdsa::SigningKey,
     domains: &[&str],
 ) -> eyre::Result<x509_cert::request::CertReq> {
-    let subject = "CN=localhost".parse::<Name>().unwrap();
+    let primary_domain = domains.first().unwrap();
+    let subject = format!("CN={primary_domain}").parse::<Name>().unwrap();
 
     let mut csr = CsrBuilder::new(subject, signer).unwrap();
 
-    csr.add_extension(&SubjectAltName(
-        domains
-            .iter()
-            .map(|domain| GeneralName::DnsName(Ia5String::new(domain).unwrap()))
-            .collect(),
-    ))
-    .unwrap();
+    if domains.len() > 1 {
+        csr.add_extension(&SubjectAltName(
+            domains[0..]
+                .iter()
+                .map(|domain| GeneralName::DnsName(Ia5String::new(domain).unwrap()))
+                .collect(),
+        ))
+        .unwrap();
+    }
 
     csr.build::<p256::ecdsa::DerSignature>()
         .context("build csr")
@@ -70,7 +73,7 @@ impl Certificate {
 
     pub fn parse(signing_key_pem: Zeroizing<String>, certificate: String) -> eyre::Result<Self> {
         // validate certificate
-        x509_cert::Certificate::from_pem(certificate.as_bytes())?;
+        x509_cert::Certificate::from_pem(certificate.as_str())?;
 
         // validate private key
         ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&signing_key_pem)?;

@@ -13,7 +13,7 @@ pub(crate) async fn req_get(url: &str) -> reqwest::Response {
 
 pub(crate) async fn req_head(url: &str) -> reqwest::Response {
     let client = http_client();
-    let req = client.head(url);
+    let req = client.head(url).header("cache-control", "no-store");
     log::trace!("{req:?}");
     req.send().await.unwrap()
 }
@@ -44,6 +44,9 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
     let problem = if res.headers().get("content-type").unwrap() == "application/problem+json" {
         // if we were sent a problem+json, deserialize it
         let body = res.text().await.unwrap();
+
+        log::trace!("error response body: {body}");
+
         serde_json::from_str(&body).unwrap_or_else(|err| ApiProblem {
             _type: "problemJsonFail".to_owned(),
             detail: Some(format!(

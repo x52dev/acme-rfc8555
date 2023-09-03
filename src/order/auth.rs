@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use base64::prelude::*;
 use sha2::{Digest as _, Sha256};
@@ -6,7 +6,7 @@ use sha2::{Digest as _, Sha256};
 use crate::{
     acc::{AccountInner, AcmeKey},
     api::{ApiAuth, ApiChallenge, ApiEmptyObject, ApiEmptyString},
-    jwt::{Jwk, JwkThumb},
+    jws::{Jwk, JwkThumb},
 };
 
 /// An authorization ([ownership proof]) for a domain name.
@@ -79,7 +79,7 @@ impl Auth {
     ///   };
     ///
     ///   let mut file = File::create(&path)?;
-    ///   file.write_all(challenge.http_proof()?.as_bytes())?;
+    ///   file.write_all(challenge.http_proof()?)?;
     ///   challenge.validate(Duration::from_millis(5000)).await?;
     ///
     ///   Ok(())
@@ -202,7 +202,7 @@ impl Challenge<TlsAlpn> {
     pub fn tls_alpn_proof(&self) -> eyre::Result<[u8; 32]> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
-        Ok(Sha256::digest(proof.as_bytes()).try_into().unwrap())
+        Ok(Sha256::digest(proof).try_into().unwrap())
     }
 }
 
@@ -244,16 +244,12 @@ impl<A> Challenge<A> {
                 .filter_map(|c| c.error.as_ref())
                 .next();
 
-            let reason = if let Some(error) = error {
-                format!(
-                    "Failed: {}",
-                    error.detail.clone().unwrap_or_else(|| error._type.clone())
-                )
-            } else {
-                "Validation failed and no error found".to_owned()
+            let reason = match error {
+                Some(error) => error.detail.clone().unwrap_or_else(|| error._type.clone()),
+                None => "Validation failed and no error found".to_owned(),
             };
 
-            return Err(eyre::eyre!("Validation failed: {:?}", reason));
+            return Err(eyre::eyre!("Validation failed: {reason}"));
         }
 
         Ok(())
@@ -270,11 +266,11 @@ fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> eyre::Re
     let jwk_thumb = JwkThumb::from(&jwk);
     let jwk_json = serde_json::to_string(&jwk_thumb)?;
 
-    let digest = BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(jwk_json.as_bytes()));
+    let digest = BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(jwk_json));
     let key_auth = format!("{token}.{digest}");
 
     let res = if extra_sha256 {
-        BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(key_auth.as_bytes()))
+        BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(key_auth))
     } else {
         key_auth
     };
@@ -290,10 +286,12 @@ async fn wait_for_auth_status(
     let auth = loop {
         let res = inner.transport.call(auth_url, &ApiEmptyString).await?;
         let auth = res.json::<ApiAuth>().await?;
+
         if !auth.is_status_pending() {
             break auth;
         }
-        thread::sleep(delay);
+
+        tokio::time::sleep(delay).await;
     };
 
     Ok(auth)

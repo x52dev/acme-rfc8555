@@ -69,12 +69,12 @@ impl Account {
     /// and a variable number of `alt_names`.
     ///
     /// This library doesn't constrain the number of `alt_names`, but it is limited by the ACME
-    /// API provider. Let's Encrypt sets a max of [100 names] per certificate.
+    /// API provider. Let's Encrypt [sets a max of 100 names] per certificate.
     ///
     /// Every call creates a new order with the ACME API provider, even when the domain
     /// names supplied are exactly the same.
     ///
-    /// [100 names]: https://letsencrypt.org/docs/rate-limits/
+    /// [sets a max of 100 names]: https://letsencrypt.org/docs/rate-limits/
     pub async fn new_order(
         &self,
         primary_name: &str,
@@ -83,17 +83,18 @@ impl Account {
         // construct the identifiers
         let prim_arr = [primary_name];
         let domains = prim_arr.iter().chain(alt_names);
+        let identifiers = domains
+            .map(|&domain| ApiIdentifier {
+                _type: "dns".to_owned(),
+                value: domain.to_owned(),
+            })
+            .collect();
         let order = ApiOrder {
-            identifiers: domains
-                .map(|&domain| ApiIdentifier {
-                    _type: "dns".to_owned(),
-                    value: domain.to_owned(),
-                })
-                .collect(),
+            identifiers,
             ..Default::default()
         };
 
-        let new_order_url = &self.inner.api_directory.new_order;
+        let new_order_url = self.inner.api_directory.new_order.as_str();
 
         let res = self.inner.transport.call(new_order_url, &order).await?;
         let order_url = req_expect_header(&res, "location")?;

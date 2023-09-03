@@ -8,18 +8,21 @@ use crate::{
     Account,
 };
 
-const LETSENCRYPT: &str = "https://acme-v02.api.letsencrypt.org/directory";
-const LETSENCRYPT_STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
+const LETSENCRYPT_URL: &str = "https://acme-v02.api.letsencrypt.org/directory";
+const LETSENCRYPT_STAGING_URL: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 
 /// Enumeration of known ACME API directories.
 #[derive(Debug, Clone)]
 pub enum DirectoryUrl<'a> {
-    /// The main Let's Encrypt directory. Not appropriate for testing and dev.
+    /// The main Let's Encrypt directory.
+    ///
+    /// Not appropriate for testing / development.
     LetsEncrypt,
 
-    /// The staging Let's Encrypt directory. Use for testing and dev. Doesn't issue
-    /// "valid" certificates. The root signing certificate is not supposed
-    /// to be in any trust chains.
+    /// The staging Let's Encrypt directory.
+    ///
+    /// Use for testing and development. Doesn't issue "valid" certificates. The root signing
+    /// certificate is not supposed to be in any trust chains.
     LetsEncryptStaging,
 
     /// Provide an arbitrary director URL to connect to.
@@ -29,9 +32,9 @@ pub enum DirectoryUrl<'a> {
 impl<'a> DirectoryUrl<'a> {
     fn to_url(&self) -> &str {
         match self {
-            DirectoryUrl::LetsEncrypt => LETSENCRYPT,
-            DirectoryUrl::LetsEncryptStaging => LETSENCRYPT_STAGING,
-            DirectoryUrl::Other(s) => s,
+            DirectoryUrl::LetsEncrypt => LETSENCRYPT_URL,
+            DirectoryUrl::LetsEncryptStaging => LETSENCRYPT_STAGING_URL,
+            DirectoryUrl::Other(url) => url,
         }
     }
 }
@@ -46,10 +49,10 @@ pub struct Directory {
 impl Directory {
     /// Create a directory over a persistence implementation and directory url.
     pub async fn from_url(url: DirectoryUrl<'_>) -> eyre::Result<Directory> {
-        let dir_url = url.to_url();
-        let res = req_handle_error(req_get(dir_url).await).await?;
+        let res = req_handle_error(req_get(url.to_url()).await).await?;
         let api_directory = res.json::<ApiDirectory>().await?;
         let nonce_pool = Arc::new(NoncePool::new(&api_directory.new_nonce));
+
         Ok(Directory {
             nonce_pool,
             api_directory,
@@ -79,17 +82,20 @@ impl Directory {
         // new keys and existing. For existing the spec says to return a 200
         // with the Location header set to the key id (kid).
         let acc = ApiAccount {
+            // TODO: ensure email contains no hfields or more than one addr-spec in the to component
+            // see https://datatracker.ietf.org/doc/html/rfc8555#section-7.3
             contact,
             terms_of_service_agreed: Some(true),
             ..Default::default()
         };
 
-        let mut transport = Transport::new(&self.nonce_pool, acme_key);
+        let mut transport = Transport::new(Arc::clone(&self.nonce_pool), acme_key);
         let res = transport
             .call_jwk(&self.api_directory.new_account, &acc)
             .await?;
+
         let kid = req_expect_header(&res, "location")?;
-        log::debug!("Key id is: {}", kid);
+        log::debug!("Key ID is: {kid}");
         let api_account = res.json::<ApiAccount>().await?;
 
         // fill in the server returned key id
@@ -160,7 +166,7 @@ mod tests {
 
     //         use std::thread;
     //         use std::time::Duration;
-    //         thread::sleep(Duration::from_millis(60_000));
+    //         tokio::time::sleep(Duration::from_millis(60_000)).await;
 
     //         chall.validate(5000)?;
 
