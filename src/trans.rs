@@ -1,9 +1,7 @@
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use std::{collections::VecDeque, sync::Arc};
 
 use base64::prelude::*;
+use parking_lot::Mutex;
 use serde::Serialize;
 
 use crate::{
@@ -128,10 +126,13 @@ impl NoncePool {
     fn extract_nonce(&self, res: &reqwest::Response) {
         if let Some(nonce) = res.headers().get("replay-nonce") {
             log::trace!("Extracting new nonce");
-            let mut pool = self.pool.lock().unwrap();
+
+            let mut pool = self.pool.lock();
+
             // TODO: ignore invalid replay-nonce values
             // see https://datatracker.ietf.org/doc/html/rfc8555#section-6.5.1
             pool.push_back(nonce.to_str().unwrap().to_owned());
+
             if pool.len() > 10 {
                 pool.pop_front();
             }
@@ -140,7 +141,8 @@ impl NoncePool {
 
     async fn get_nonce(&self) -> eyre::Result<String> {
         {
-            let mut pool = self.pool.lock().unwrap();
+            let mut pool = self.pool.lock();
+
             if let Some(nonce) = pool.pop_front() {
                 log::trace!("Use previous nonce");
                 return Ok(nonce);
