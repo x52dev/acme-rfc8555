@@ -20,10 +20,10 @@
 
 use std::{sync::Arc, thread, time::Duration};
 
-use anyhow::{anyhow, Context as _};
 use base64::prelude::*;
 use der::Encode as _;
 use ecdsa::SigningKey;
+use eyre::Context as _;
 use pkcs8::{DecodePrivateKey as _, EncodePrivateKey as _};
 
 use crate::{
@@ -255,7 +255,10 @@ impl CsrOrder {
         let order = wait_for_order_status(&inner, &order_url, delay).await?;
 
         if !order.api_order.is_status_valid() {
-            return Err(anyhow!("Order is in status: {:?}", order.api_order.status));
+            return Err(eyre::eyre!(
+                "Order is in status: {:?}",
+                order.api_order.status
+            ));
         }
 
         Ok(CertOrder { signing_key, order })
@@ -294,7 +297,7 @@ impl CertOrder {
             .order
             .api_order
             .certificate
-            .ok_or_else(|| anyhow!("certificate url"))?;
+            .ok_or_else(|| eyre::eyre!("certificate url"))?;
 
         let inner = self.order.inner;
 

@@ -1,6 +1,5 @@
 use std::{sync::Arc, thread, time::Duration};
 
-use anyhow::anyhow;
 use base64::prelude::*;
 use sha2::{Digest as _, Sha256};
 
@@ -254,7 +253,7 @@ impl<A> Challenge<A> {
                 "Validation failed and no error found".to_owned()
             };
 
-            return Err(anyhow!("Validation failed: {:?}", reason));
+            return Err(eyre::eyre!("Validation failed: {:?}", reason));
         }
 
         Ok(())

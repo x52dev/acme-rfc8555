@@ -1,4 +1,4 @@
-use anyhow::Context as _;
+use eyre::WrapErr as _;
 use pkcs8::{DecodePrivateKey as _, EncodePrivateKey as _};
 use zeroize::Zeroizing;
 
