@@ -79,7 +79,7 @@ impl Auth {
     ///   };
     ///
     ///   let mut file = File::create(&path)?;
-    ///   file.write_all(challenge.http_proof()?)?;
+    ///   file.write_all(challenge.http_proof()?.as_bytes())?;
     ///   challenge.validate(Duration::from_millis(5000)).await?;
     ///
     ///   Ok(())
