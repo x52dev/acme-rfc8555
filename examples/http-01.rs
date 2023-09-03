@@ -10,6 +10,8 @@ const PRIMARY_NAME: &str = "example.org";
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> eyre::Result<()> {
+    color_eyre::install()?;
+
     // Use `DirectoryUrl::LetsEncrypt` for production uses.
     let url = DirectoryUrl::LetsEncryptStaging;
 
