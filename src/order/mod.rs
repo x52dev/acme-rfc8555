@@ -222,7 +222,7 @@ impl CsrOrder {
         self.finalize_signing_key(signing_key, delay).await
     }
 
-    /// Lower level finalize call that works directly with the openssl crate structures.
+    /// Lower level finalize call.
     ///
     /// Creates the CSR for the domains in the order and submit it to the ACME API.
     ///

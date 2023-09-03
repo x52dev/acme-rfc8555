@@ -147,13 +147,8 @@
 //!
 //! ## Implementation details
 //!
-//! The library tries to pull in as few dependencies as possible. (For now) that means using
-//! synchronous I/O and blocking cals. This doesn't rule out a futures based version later.
-//!
-//! It is written by following the
-//! [ACME draft spec 18](https://tools.ietf.org/html/draft-ietf-acme-acme-18), and relies
-//! heavily on the [openssl](https://docs.rs/openssl/) crate to make JWK/JWT and sign requests
-//! to the API.
+//! This library follows the
+//! [ACME draft spec 18](https://tools.ietf.org/html/draft-ietf-acme-acme-18).
 
 #[cfg(doctest)]
 doc_comment::doctest!("../README.md");
