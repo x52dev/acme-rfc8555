@@ -74,6 +74,21 @@ pub struct ApiSubproblem {
 }
 
 /// <https://datatracker.ietf.org/doc/html/rfc8555#section-7.1.1>
+//
+// {
+//   "newNonce": "https://example.com/acme/new-nonce",
+//   "newAccount": "https://example.com/acme/new-account",
+//   "newOrder": "https://example.com/acme/new-order",
+//   "newAuthz": "https://example.com/acme/new-authz",
+//   "revokeCert": "https://example.com/acme/revoke-cert",
+//   "keyChange": "https://example.com/acme/key-change",
+//   "meta": {
+//     "termsOfService": "https://example.com/acme/terms/2017-5-30",
+//     "website": "https://www.example.com/",
+//     "caaIdentities": ["example.com"],
+//     "externalAccountRequired": false
+//   }
+// }
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiDirectory {
@@ -91,6 +106,7 @@ pub struct ApiDirectory {
     pub meta: Option<ApiDirectoryMeta>,
 }
 
+/// <https://datatracker.ietf.org/doc/html/rfc8555#section-9.7.6>
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiDirectoryMeta {
@@ -164,6 +180,7 @@ impl ApiAccount {
     }
 }
 
+/// <https://datatracker.ietf.org/doc/html/rfc8555#section-7.1.3>
 // {
 //   "status": "pending",
 //   "expires": "2019-01-09T08:26:43.570360537Z",

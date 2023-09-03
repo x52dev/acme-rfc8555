@@ -70,7 +70,7 @@ impl Auth {
     ///
     /// use acme_lite::order::Auth;
     ///
-    /// async fn web_authorize(auth: &Auth) -> anyhow::Result<()> {
+    /// async fn web_authorize(auth: &Auth) -> eyre::Result<()> {
     ///   let challenge = auth.http_challenge().unwrap();
     ///
     ///   // Assuming our web server's root is under /var/www
@@ -107,7 +107,7 @@ impl Auth {
     ///
     /// use acme_lite::order::Auth;
     ///
-    /// async fn dns_authorize(auth: &Auth) -> anyhow::Result<()> {
+    /// async fn dns_authorize(auth: &Auth) -> eyre::Result<()> {
     ///   let challenge = auth.dns_challenge().unwrap();
     ///   let record = format!("_acme-challenge.{}.", auth.domain_name());
     ///   // route_53_set_record(&record, "TXT", challenge.dns_proof());
@@ -177,7 +177,7 @@ impl Challenge<Http> {
     }
 
     /// The `proof` is some text content that is placed in the file named by `token`.
-    pub fn http_proof(&self) -> anyhow::Result<String> {
+    pub fn http_proof(&self) -> eyre::Result<String> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
         Ok(proof)
@@ -190,7 +190,7 @@ impl Challenge<Dns> {
     /// ```text
     /// _acme-challenge.<domain-to-be-proven>.  TXT  <proof>
     /// ```
-    pub fn dns_proof(&self) -> anyhow::Result<String> {
+    pub fn dns_proof(&self) -> eyre::Result<String> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, true)?;
         Ok(proof)
@@ -200,7 +200,7 @@ impl Challenge<Dns> {
 impl Challenge<TlsAlpn> {
     /// The `proof` is the contents of the ACME extension to be placed in the
     /// certificate used for validation.
-    pub fn tls_alpn_proof(&self) -> anyhow::Result<[u8; 32]> {
+    pub fn tls_alpn_proof(&self) -> eyre::Result<[u8; 32]> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
         Ok(Sha256::digest(proof.as_bytes()).try_into().unwrap())
@@ -227,7 +227,7 @@ impl<A> Challenge<A> {
     ///
     /// The user must first update the DNS record or HTTP web server depending
     /// on the type challenge being validated.
-    pub async fn validate(&self, delay: Duration) -> anyhow::Result<()> {
+    pub async fn validate(&self, delay: Duration) -> eyre::Result<()> {
         let res = self
             .inner
             .transport
@@ -266,7 +266,7 @@ impl<A> Challenge<A> {
     }
 }
 
-fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> anyhow::Result<String> {
+fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> eyre::Result<String> {
     let jwk = Jwk::try_from(key)?;
     let jwk_thumb = JwkThumb::from(&jwk);
     let jwk_json = serde_json::to_string(&jwk_thumb)?;
@@ -287,7 +287,7 @@ async fn wait_for_auth_status(
     inner: &Arc<AccountInner>,
     auth_url: &str,
     delay: Duration,
-) -> anyhow::Result<ApiAuth> {
+) -> eyre::Result<ApiAuth> {
     let auth = loop {
         let res = inner.transport.call(auth_url, &ApiEmptyString).await?;
         let auth = res.json::<ApiAuth>().await?;

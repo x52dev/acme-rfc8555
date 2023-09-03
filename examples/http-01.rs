@@ -9,7 +9,7 @@ use actix_web::{App, HttpServer};
 const PRIMARY_NAME: &str = "example.org";
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> eyre::Result<()> {
     // Use `DirectoryUrl::LetsEncrypt` for production uses.
     let url = DirectoryUrl::LetsEncryptStaging;
 

@@ -13,7 +13,7 @@ use std::time::Duration;
 use acme_lite::{Certificate, Directory, DirectoryUrl, create_p384_key};
 
 # #[tokio::test]
-async fn request_cert() -> anyhow::Result<Certificate> {
+async fn request_cert() -> eyre::Result<Certificate> {
     // Use `DirectoryUrl::LetsEncrypt` for production.
     let url = DirectoryUrl::LetsEncryptStaging;
 
@@ -32,7 +32,7 @@ async fn request_cert() -> anyhow::Result<Certificate> {
     let acc = dir.load_account(&singing_key, Some(contact))?;
 
     // Order a new TLS certificate for a domain.
-    let mut ord_new = acc.new_order("mydomain.io", &[])?;
+    let mut ord_new = acc.new_order("example.org", &[])?;
 
     // If the ownership of the domain(s) have already been
     // authorized in a previous order, you might be able to
@@ -56,7 +56,7 @@ async fn request_cert() -> anyhow::Result<Certificate> {
         // web for the domain(s) you are trying to get a
         // certificate for:
         //
-        // http://mydomain.io/.well-known/acme-challenge/<token>
+        // http://example.org/.well-known/acme-challenge/<token>
         let challenge = auths[0].http_challenge().unwrap();
 
         // The token is the filename.

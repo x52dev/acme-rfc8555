@@ -45,7 +45,7 @@ pub struct Directory {
 
 impl Directory {
     /// Create a directory over a persistence implementation and directory url.
-    pub async fn from_url(url: DirectoryUrl<'_>) -> anyhow::Result<Directory> {
+    pub async fn from_url(url: DirectoryUrl<'_>) -> eyre::Result<Directory> {
         let dir_url = url.to_url();
         let res = req_handle_error(req_get(dir_url).await).await?;
         let api_directory = res.json::<ApiDirectory>().await?;
@@ -56,7 +56,7 @@ impl Directory {
         })
     }
 
-    pub async fn register_account(&self, contact: Option<Vec<String>>) -> anyhow::Result<Account> {
+    pub async fn register_account(&self, contact: Option<Vec<String>>) -> eyre::Result<Account> {
         let acme_key = AcmeKey::new();
         self.upsert_account(acme_key, contact).await
     }
@@ -65,7 +65,7 @@ impl Directory {
         &self,
         signing_key_pem: &str,
         contact: Option<Vec<String>>,
-    ) -> anyhow::Result<Account> {
+    ) -> eyre::Result<Account> {
         let acme_key = AcmeKey::from_pem(signing_key_pem)?;
         self.upsert_account(acme_key, contact).await
     }
@@ -74,7 +74,7 @@ impl Directory {
         &self,
         acme_key: AcmeKey,
         contact: Option<Vec<String>>,
-    ) -> anyhow::Result<Account> {
+    ) -> eyre::Result<Account> {
         // Prepare making a call to newAccount. This is fine to do both for
         // new keys and existing. For existing the spec says to return a 200
         // with the Location header set to the key id (kid).

@@ -7,12 +7,13 @@ use hyper::{
     Body, Method, Request, Response, Server,
 };
 use once_cell::sync::Lazy;
+use tokio::sync::oneshot;
 
 static RE_URL: Lazy<regex::Regex> = Lazy::new(|| regex::Regex::new("<URL>").unwrap());
 
 pub struct TestServer {
     pub dir_url: String,
-    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
+    shutdown: Option<oneshot::Sender<()>>,
 }
 
 impl Drop for TestServer {
@@ -196,10 +197,10 @@ pub fn with_directory_server() -> TestServer {
     let tcp = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = tcp.local_addr().unwrap().port();
 
-    let url = format!("http://127.0.0.1:{}", port);
+    let url = format!("http://127.0.0.1:{port}");
     let dir_url = format!("{url}/directory");
 
-    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let (tx, rx) = oneshot::channel::<()>();
 
     let make_service = make_service_fn(move |_| {
         let url = url.clone();

@@ -16,7 +16,7 @@ use zeroize::Zeroizing;
 ///
 /// This library does not check the number of bits used to create the key pair.
 /// For Let's Encrypt, the bits must be between 2048 and 4096.
-pub fn create_rsa_key(bit_size: usize) -> anyhow::Result<rsa::RsaPrivateKey> {
+pub fn create_rsa_key(bit_size: usize) -> eyre::Result<rsa::RsaPrivateKey> {
     let csprng = &mut rand::thread_rng();
     Ok(rsa::RsaPrivateKey::new(csprng, bit_size)?)
 }
@@ -36,7 +36,7 @@ pub fn create_p384_key() -> ecdsa::SigningKey<p384::NistP384> {
 pub(crate) fn create_csr(
     signer: &p256::ecdsa::SigningKey,
     domains: &[&str],
-) -> anyhow::Result<x509_cert::request::CertReq> {
+) -> eyre::Result<x509_cert::request::CertReq> {
     let subject = "CN=localhost".parse::<Name>().unwrap();
 
     let mut csr = CsrBuilder::new(subject, signer).unwrap();
@@ -68,7 +68,7 @@ impl Certificate {
         }
     }
 
-    pub fn parse(signing_key_pem: Zeroizing<String>, certificate: String) -> anyhow::Result<Self> {
+    pub fn parse(signing_key_pem: Zeroizing<String>, certificate: String) -> eyre::Result<Self> {
         // validate certificate
         x509_cert::Certificate::from_pem(certificate.as_bytes())?;
 
@@ -87,7 +87,7 @@ impl Certificate {
     }
 
     /// The private key as DER.
-    pub fn private_key_der(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn private_key_der(&self) -> eyre::Result<Vec<u8>> {
         let signing_key =
             ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&self.signing_key_pem)?;
         let der = signing_key.to_pkcs8_der()?;
@@ -100,7 +100,7 @@ impl Certificate {
     }
 
     /// The issued certificate as DER.
-    pub fn certificate_der(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn certificate_der(&self) -> eyre::Result<Vec<u8>> {
         let x509 = x509_cert::Certificate::from_pem(&self.certificate)?;
         x509.to_der().context("der")
     }
@@ -112,7 +112,7 @@ impl Certificate {
     /// issued cert, since it counts _whole_ days.
     ///
     /// It is possible to get negative days for an expired certificate.
-    pub fn valid_days_left(&self) -> anyhow::Result<i64> {
+    pub fn valid_days_left(&self) -> eyre::Result<i64> {
         // the cert used in the tests is not valid to load as x509
         if cfg!(test) {
             return Ok(89);

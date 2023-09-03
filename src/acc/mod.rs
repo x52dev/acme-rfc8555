@@ -59,7 +59,7 @@ impl Account {
     /// Signing key for this account.
     ///
     /// The key is an elliptic curve signing key.
-    pub fn acme_signing_key_pem(&self) -> anyhow::Result<Zeroizing<String>> {
+    pub fn acme_signing_key_pem(&self) -> eyre::Result<Zeroizing<String>> {
         self.inner.transport.acme_key().to_pem()
     }
 
@@ -79,7 +79,7 @@ impl Account {
         &self,
         primary_name: &str,
         alt_names: &[&str],
-    ) -> anyhow::Result<NewOrder> {
+    ) -> eyre::Result<NewOrder> {
         // construct the identifiers
         let prim_arr = [primary_name];
         let domains = prim_arr.iter().chain(alt_names);
@@ -108,7 +108,7 @@ impl Account {
         &self,
         cert: &Certificate,
         reason: RevocationReason,
-    ) -> anyhow::Result<()> {
+    ) -> eyre::Result<()> {
         // convert to base64url of the DER (which is not PEM).
         let certificate = BASE64_URL_SAFE_NO_PAD.encode(cert.certificate_der()?);
 

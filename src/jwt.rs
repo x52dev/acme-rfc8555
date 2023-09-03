@@ -61,7 +61,7 @@ pub(crate) struct JwkThumb {
 impl TryFrom<&AcmeKey> for Jwk {
     type Error = anyhow::Error;
 
-    fn try_from(a: &AcmeKey) -> anyhow::Result<Self> {
+    fn try_from(a: &AcmeKey) -> eyre::Result<Self> {
         let point = a.signing_key().verifying_key().to_encoded_point(false);
 
         let x = point.x().unwrap();

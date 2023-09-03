@@ -57,7 +57,7 @@ pub(crate) async fn refresh_order(
     inner: &Arc<AccountInner>,
     url: String,
     want_status: &'static str,
-) -> anyhow::Result<Order> {
+) -> eyre::Result<Order> {
     let res = inner.transport.call(&url, &ApiEmptyString).await?;
 
     // our test rig requires the order to be in `want_status`.
@@ -72,13 +72,13 @@ pub(crate) async fn refresh_order(
 }
 
 #[cfg(not(test))]
-async fn api_order_of(res: reqwest::Response, _want_status: &str) -> anyhow::Result<ApiOrder> {
+async fn api_order_of(res: reqwest::Response, _want_status: &str) -> eyre::Result<ApiOrder> {
     Ok(res.json().await?)
 }
 
 #[cfg(test)]
 // our test rig requires the order to be in `want_status`
-async fn api_order_of(res: reqwest::Response, want_status: &str) -> anyhow::Result<ApiOrder> {
+async fn api_order_of(res: reqwest::Response, want_status: &str) -> eyre::Result<ApiOrder> {
     let s = res.text().await?;
     #[allow(clippy::trivial_regex)]
     let re = regex::Regex::new("<STATUS>").unwrap();
@@ -143,7 +143,7 @@ impl NewOrder {
     /// Refresh the order state against the ACME API.
     ///
     /// The specification calls this a "POST-as-GET" against the order URL.
-    pub async fn refresh(&mut self) -> anyhow::Result<()> {
+    pub async fn refresh(&mut self) -> eyre::Result<()> {
         let order = refresh_order(&self.order.inner, self.order.url.clone(), "ready").await?;
         self.order = order;
         Ok(())
@@ -155,7 +155,7 @@ impl NewOrder {
     ///
     /// If the order includes new domain names that have not been authorized before, this
     /// list might contain a mix of already valid and not yet valid auths.
-    pub async fn authorizations(&self) -> anyhow::Result<Vec<Auth>> {
+    pub async fn authorizations(&self) -> eyre::Result<Vec<Auth>> {
         let mut result = vec![];
         if let Some(authorizations) = &self.order.api_order.authorizations {
             for auth_url in authorizations {
@@ -212,11 +212,7 @@ impl CsrOrder {
     /// This is a convenience wrapper that in turn calls the lower level [`finalize_signing_key`].
     ///
     /// [`finalize_signing_key`]: struct.CsrOrder.html#method.finalize_signing_key
-    pub async fn finalize(
-        self,
-        private_key_pem: &str,
-        delay: Duration,
-    ) -> anyhow::Result<CertOrder> {
+    pub async fn finalize(self, private_key_pem: &str, delay: Duration) -> eyre::Result<CertOrder> {
         let signing_key =
             SigningKey::from_pkcs8_pem(private_key_pem).context("Error reading private key PEM")?;
         self.finalize_signing_key(signing_key, delay).await
@@ -233,7 +229,7 @@ impl CsrOrder {
         self,
         signing_key: p256::ecdsa::SigningKey,
         delay: Duration,
-    ) -> anyhow::Result<CertOrder> {
+    ) -> eyre::Result<CertOrder> {
         // the domains that we have authorized
         let domains = self.order.api_order.domains();
 
@@ -275,7 +271,7 @@ async fn wait_for_order_status(
     inner: &Arc<AccountInner>,
     url: &str,
     delay: Duration,
-) -> anyhow::Result<Order> {
+) -> eyre::Result<Order> {
     loop {
         let order = refresh_order(inner, url.to_owned(), "valid").await?;
         if !order.api_order.is_status_processing() {
@@ -293,7 +289,7 @@ pub struct CertOrder {
 
 impl CertOrder {
     /// Request download of the issued certificate.
-    pub async fn download_cert(self) -> anyhow::Result<Certificate> {
+    pub async fn download_cert(self) -> eyre::Result<Certificate> {
         let url = self
             .order
             .api_order
