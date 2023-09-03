@@ -38,7 +38,7 @@ impl Auth {
         Auth {
             inner: inner.clone(),
             api_auth,
-            auth_url: auth_url.into(),
+            auth_url: auth_url.to_owned(),
         }
     }
 
@@ -123,13 +123,12 @@ impl Auth {
             .map(|c| Challenge::new(&self.inner, c.clone(), &self.auth_url))
     }
 
-    /// Get the TLS ALPN challenge.
+    /// Returns the TLS ALPN challenge.
     ///
-    /// The TLS ALPN challenge is a certificate that must be served when a
-    /// request is made for the ALPN protocol "tls-alpn-01". The certificate
-    /// must contain a single dNSName SAN containing the domain being
-    /// validated, as well as an ACME extension containing the SHA256 of the
-    /// key authorization.
+    /// The TLS ALPN challenge is a certificate that must be served when a request is made for the
+    /// ALPN protocol "tls-alpn-01". The certificate must contain a single DNSName SAN containing
+    /// the domain being validated, as well as an ACME extension containing the SHA256 of the key
+    /// authorization.
     pub fn tls_alpn_challenge(&self) -> Option<Challenge<TlsAlpn>> {
         self.api_auth
             .tls_alpn_challenge()
@@ -213,7 +212,7 @@ impl<A> Challenge<A> {
         Challenge {
             inner: inner.clone(),
             api_challenge,
-            auth_url: auth_url.into(),
+            auth_url: auth_url.to_owned(),
             _ph: std::marker::PhantomData,
         }
     }
@@ -252,7 +251,7 @@ impl<A> Challenge<A> {
                     error.detail.clone().unwrap_or_else(|| error._type.clone())
                 )
             } else {
-                "Validation failed and no error found".into()
+                "Validation failed and no error found".to_owned()
             };
 
             return Err(anyhow!("Validation failed: {:?}", reason));

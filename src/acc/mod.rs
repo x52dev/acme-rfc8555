@@ -56,10 +56,10 @@ impl Account {
         }
     }
 
-    /// Private key for this account.
+    /// Signing key for this account.
     ///
-    /// The key is an elliptic curve private key.
-    pub fn acme_private_key_pem(&self) -> anyhow::Result<Zeroizing<String>> {
+    /// The key is an elliptic curve signing key.
+    pub fn acme_signing_key_pem(&self) -> anyhow::Result<Zeroizing<String>> {
         self.inner.transport.acme_key().to_pem()
     }
 

@@ -34,6 +34,7 @@ fn get_directory(url: &str) -> Response<Body> {
         ]
     }
     }"#;
+
     Response::new(Body::from(RE_URL.replace_all(BODY, url)))
 }
 
@@ -66,7 +67,11 @@ fn post_new_acct(url: &str) -> Response<Body> {
     "createdAt": "2018-12-31T17:15:40.399104457Z",
     "status": "valid"
     }"#;
-    let location: String = RE_URL.replace_all("<URL>/acme/acct/7728515", url).into();
+
+    let location = RE_URL
+        .replace_all("<URL>/acme/acct/7728515", url)
+        .into_owned();
+
     Response::builder()
         .status(201)
         .header("Location", location)
@@ -89,9 +94,11 @@ fn post_new_order(url: &str) -> Response<Body> {
     ],
     "finalize": "<URL>/acme/finalize/7738992/18234324"
     }"#;
-    let location: String = RE_URL
+
+    let location = RE_URL
         .replace_all("<URL>/acme/order/YTqpYUthlVfwBncUufE8", url)
-        .into();
+        .into_owned();
+
     Response::builder()
         .status(201)
         .header("Location", location)
@@ -115,8 +122,13 @@ fn post_get_order(url: &str) -> Response<Body> {
     "finalize": "<URL>/acme/finalize/7738992/18234324",
     "certificate": "<URL>/acme/cert/fae41c070f967713109028"
     }"#;
-    let b = RE_URL.replace_all(BODY, url).into_owned();
-    Response::builder().status(200).body(Body::from(b)).unwrap()
+
+    let body = RE_URL.replace_all(BODY, url).into_owned();
+
+    Response::builder()
+        .status(200)
+        .body(Body::from(body))
+        .unwrap()
 }
 
 fn post_authz(url: &str) -> Response<Body> {
@@ -148,6 +160,7 @@ fn post_authz(url: &str) -> Response<Body> {
         }
         ]
     }"#;
+
     Response::builder()
         .status(201)
         .body(Body::from(RE_URL.replace_all(BODY, url)))

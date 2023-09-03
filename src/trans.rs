@@ -81,7 +81,7 @@ impl Transport {
             // Sign the body.
             let body = make_body(url, nonce, &self.acme_key, body)?;
 
-            log::debug!("Call endpoint {}", url);
+            log::debug!("Call endpoint {url}");
 
             // Post it to the URL
             let response = req_post(url, &body).await;
@@ -101,7 +101,7 @@ impl Transport {
                 }
                 // it seems we sometimes make bad JWTs. Why?!
                 if problem.is_jwt_verification_error() {
-                    log::debug!("Retrying on: {}", problem);
+                    log::debug!("Retrying on: {problem}");
                     continue;
                 }
             }
@@ -121,7 +121,7 @@ pub(crate) struct NoncePool {
 impl NoncePool {
     pub fn new(nonce_url: &str) -> Self {
         NoncePool {
-            nonce_url: nonce_url.into(),
+            nonce_url: nonce_url.to_owned(),
             ..Default::default()
         }
     }
@@ -192,7 +192,7 @@ fn jws_with<T: Serialize + ?Sized>(
         }
     };
 
-    let to_sign = format!("{}.{}", protected, payload);
+    let to_sign = format!("{protected}.{payload}");
     let digest = sha2::Sha256::digest(to_sign.as_bytes());
     let (sig, _rec_id) = key.signing_key().sign_recoverable(&digest).unwrap();
     let r = sig.r().to_bytes().to_vec();

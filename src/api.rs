@@ -1,4 +1,4 @@
-//! Low level API JSON objects.
+//! Low-level API JSON objects.
 //!
 //! Unstable and not to be used directly. Provided to aid debugging.
 
@@ -9,7 +9,7 @@ use serde::{
     Deserialize, Serialize,
 };
 
-/// Serializes to `""`
+/// Serializes to `""`.
 pub struct ApiEmptyString;
 
 impl Serialize for ApiEmptyString {
@@ -18,7 +18,7 @@ impl Serialize for ApiEmptyString {
     }
 }
 
-/// Serializes to `{}`
+/// Serializes to `{}`.
 pub struct ApiEmptyObject;
 
 impl Serialize for ApiEmptyObject {
@@ -56,7 +56,7 @@ impl ApiProblem {
 }
 
 impl fmt::Display for ApiProblem {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(detail) = &self.detail {
             write!(f, "{}: {detail}", self._type)
         } else {
@@ -73,6 +73,7 @@ pub struct ApiSubproblem {
     pub identifier: Option<ApiIdentifier>,
 }
 
+/// <https://datatracker.ietf.org/doc/html/rfc8555#section-7.1.1>
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiDirectory {
@@ -112,6 +113,8 @@ impl ApiDirectoryMeta {
     }
 }
 
+/// <https://datatracker.ietf.org/doc/html/rfc8555#section-7.1.2>
+//
 //    {
 //      "status": "valid",
 //      "contact": [
@@ -131,7 +134,13 @@ pub struct ApiAccount {
     pub contact: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_account_binding: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub terms_of_service_agreed: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub only_return_existing: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orders: Option<String>,
@@ -174,8 +183,10 @@ impl ApiAccount {
 pub struct ApiOrder {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires: Option<String>,
+
     pub identifiers: Vec<ApiIdentifier>,
     pub not_before: Option<String>,
     pub not_after: Option<String>,
@@ -191,8 +202,7 @@ impl ApiOrder {
         self.status.as_ref().map(|s| s.as_ref()) == Some("pending")
     }
 
-    /// When all authorizations are finished, and we need to call
-    /// "finalize".
+    /// When all authorizations are finished, and we need to call "finalize".
     pub fn is_status_ready(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("ready")
     }
@@ -212,7 +222,7 @@ impl ApiOrder {
         self.status.as_ref().map(|s| s.as_ref()) == Some("invalid")
     }
 
-    /// Return all domains
+    /// Returns all domains.
     pub fn domains(&self) -> Vec<&str> {
         self.identifiers.iter().map(|i| i.value.as_ref()).collect()
     }
@@ -259,7 +269,7 @@ impl ApiIdentifier {
 //     }
 //   ]
 // }
-
+//
 // on incorrect challenge, something like:
 //
 //   "challenges": [
@@ -281,6 +291,10 @@ pub struct ApiAuth {
     pub status: Option<String>,
     pub expires: Option<String>,
     pub challenges: Vec<ApiChallenge>,
+
+    /// This field MUST be present and true for authorizations created as a result of a newOrder
+    /// request containing a DNS identifier with a value that was a wildcard domain name. For other
+    /// authorizations, it MUST be absent. Wildcard domain names are described in §7.1.3.
     pub wildcard: Option<bool>,
 }
 
@@ -288,30 +302,39 @@ impl ApiAuth {
     pub fn is_status_pending(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("pending")
     }
+
     pub fn is_status_valid(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("valid")
     }
+
     pub fn is_status_invalid(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("invalid")
     }
+
     pub fn is_status_deactivated(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("deactivated")
     }
+
     pub fn is_status_expired(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("expired")
     }
+
     pub fn is_status_revoked(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("revoked")
     }
+
     pub fn wildcard(&self) -> bool {
         self.wildcard.unwrap_or(false)
     }
+
     pub fn http_challenge(&self) -> Option<&ApiChallenge> {
         self.challenges.iter().find(|c| c._type == "http-01")
     }
+
     pub fn dns_challenge(&self) -> Option<&ApiChallenge> {
         self.challenges.iter().find(|c| c._type == "dns-01")
     }
+
     pub fn tls_alpn_challenge(&self) -> Option<&ApiChallenge> {
         self.challenges.iter().find(|c| c._type == "tls-alpn-01")
     }
@@ -338,12 +361,15 @@ impl ApiChallenge {
     pub fn is_status_pending(&self) -> bool {
         &self.status == "pending"
     }
+
     pub fn is_status_processing(&self) -> bool {
         &self.status == "processing"
     }
+
     pub fn is_status_valid(&self) -> bool {
         &self.status == "valid"
     }
+
     pub fn is_status_invalid(&self) -> bool {
         &self.status == "invalid"
     }

@@ -1,9 +1,14 @@
 {
     "cSpell.words": [
+        "actix",
+        "alpn",
+        "Deque",
+        "JWTs",
         "letsencrypt",
         "oneshot",
         "pkix",
         "reqwest",
+        "subproblems",
         "ureq"
     ]
 }

@@ -63,10 +63,10 @@ impl Directory {
 
     pub async fn load_account(
         &self,
-        pem: &str,
+        signing_key_pem: &str,
         contact: Option<Vec<String>>,
     ) -> anyhow::Result<Account> {
-        let acme_key = AcmeKey::from_pem(pem)?;
+        let acme_key = AcmeKey::from_pem(signing_key_pem)?;
         self.upsert_account(acme_key, contact).await
     }
 

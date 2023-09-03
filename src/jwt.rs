@@ -19,19 +19,20 @@ pub(crate) struct JwsProtected {
 impl JwsProtected {
     pub(crate) fn new_jwk(jwk: Jwk, url: &str, nonce: String) -> Self {
         JwsProtected {
-            alg: "ES256".into(),
-            url: url.into(),
+            alg: "ES256".to_owned(),
+            url: url.to_owned(),
             nonce,
             jwk: Some(jwk),
             ..Default::default()
         }
     }
+
     pub(crate) fn new_kid(kid: &str, url: &str, nonce: String) -> Self {
         JwsProtected {
-            alg: "ES256".into(),
-            url: url.into(),
+            alg: "ES256".to_owned(),
+            url: url.to_owned(),
             nonce,
-            kid: Some(kid.into()),
+            kid: Some(kid.to_owned()),
             ..Default::default()
         }
     }
@@ -67,10 +68,10 @@ impl TryFrom<&AcmeKey> for Jwk {
         let y = point.y().unwrap();
 
         Ok(Jwk {
-            alg: "ES256".into(),
-            kty: "EC".into(),
-            crv: "P-256".into(),
-            _use: "sig".into(),
+            alg: "ES256".to_owned(),
+            kty: "EC".to_owned(),
+            crv: "P-256".to_owned(),
+            _use: "sig".to_owned(),
             x: BASE64_URL_SAFE_NO_PAD.encode(x),
             y: BASE64_URL_SAFE_NO_PAD.encode(y),
         })

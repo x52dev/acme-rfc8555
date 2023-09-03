@@ -5,20 +5,20 @@ use crate::api::ApiProblem;
 pub(crate) type ReqResult<T> = std::result::Result<T, ApiProblem>;
 
 pub(crate) async fn req_get(url: &str) -> reqwest::Response {
-    let client = ureq_agent();
+    let client = http_client();
     let req = client.get(url);
     log::trace!("{req:?}");
     req.send().await.unwrap()
 }
 
 pub(crate) async fn req_head(url: &str) -> reqwest::Response {
-    let client = ureq_agent();
+    let client = http_client();
     let req = client.head(url);
     log::trace!("{req:?}");
     req.send().await.unwrap()
 }
 
-fn ureq_agent() -> reqwest::Client {
+fn http_client() -> reqwest::Client {
     reqwest::ClientBuilder::new()
         .connect_timeout(Duration::from_secs(30))
         .timeout(Duration::from_secs(30))
@@ -27,7 +27,7 @@ fn ureq_agent() -> reqwest::Client {
 }
 
 pub(crate) async fn req_post(url: &str, body: &str) -> reqwest::Response {
-    let client = ureq_agent();
+    let client = http_client();
     let req = client
         .post(url)
         .header("content-type", "application/jose+json");
@@ -45,7 +45,7 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
         // if we were sent a problem+json, deserialize it
         let body = res.text().await.unwrap();
         serde_json::from_str(&body).unwrap_or_else(|err| ApiProblem {
-            _type: "problemJsonFail".into(),
+            _type: "problemJsonFail".to_owned(),
             detail: Some(format!(
                 "Failed to deserialize application/problem+json ({err}) body: {body}"
             )),
@@ -57,7 +57,7 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
         let body = res.text().await.unwrap();
         let detail = format!("{status} body: {body}");
         ApiProblem {
-            _type: "httpReqError".into(),
+            _type: "httpReqError".to_owned(),
             detail: Some(detail),
             subproblems: None,
         }
@@ -71,7 +71,7 @@ pub(crate) fn req_expect_header(res: &reqwest::Response, name: &str) -> ReqResul
         .get(name)
         .map(|v| v.to_str().unwrap().to_owned())
         .ok_or_else(|| ApiProblem {
-            _type: format!("Missing header: {}", name),
+            _type: format!("Missing header: {name}"),
             detail: None,
             subproblems: None,
         })
