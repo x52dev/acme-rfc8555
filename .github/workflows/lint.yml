@@ -50,3 +50,21 @@ jobs:
           reporter: github-pr-check
           github_token: ${{ secrets.GITHUB_TOKEN }}
           clippy_flags: --workspace --all-targets --all-features
+
+  audit:
+    name: Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2.17.0
+        with:
+          tool: cargo-deny
+
+      - name: Audit check
+        run: cargo deny check advisories
