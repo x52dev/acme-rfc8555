@@ -99,7 +99,7 @@ impl Auth {
     /// _acme-challenge.<domain-to-be-proven>.  TXT  <proof>
     /// ```
     ///
-    /// The <proof> contains the signed token proving this account update it.
+    /// The `<proof>` contains the signed token proving this account update it.
     ///
     /// ```no_run
     /// use std::time::Duration;
@@ -155,8 +155,6 @@ pub struct Dns;
 pub struct TlsAlpn;
 
 /// A DNS, HTTP, or TLS-ALPN challenge as obtained from the [`Auth`].
-///
-/// [`Auth`]: struct.Auth.html
 pub struct Challenge<A> {
     inner: Arc<AccountInner>,
     api_challenge: ApiChallenge,
@@ -165,8 +163,9 @@ pub struct Challenge<A> {
 }
 
 impl Challenge<Http> {
-    /// The `token` is a unique identifier of the challenge. It is the file name in the
-    /// http challenge like so:
+    /// Returns the token, a unique identifier of the challenge.
+    ///
+    /// This is used as the file name in the HTTP challenge like so:
     ///
     /// ```text
     /// http://<domain-to-be-proven>/.well-known/acme-challenge/<token>
@@ -175,7 +174,9 @@ impl Challenge<Http> {
         &self.api_challenge.token
     }
 
-    /// The `proof` is some text content that is placed in the file named by `token`.
+    /// Returns the proof content for HTTP validation.
+    ///
+    /// Proof is typically placed in a text file that is served as the file named by `token`.
     pub fn http_proof(&self) -> eyre::Result<String> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
@@ -184,9 +185,11 @@ impl Challenge<Http> {
 }
 
 impl Challenge<Dns> {
-    /// The `proof` is the `TXT` record placed under:
+    /// Returns the proof content for DNS validation.
     ///
-    /// ```text
+    /// Proof is to be placed in a DNS TXT record like so:
+    ///
+    /// ```plain
     /// _acme-challenge.<domain-to-be-proven>.  TXT  <proof>
     /// ```
     pub fn dns_proof(&self) -> eyre::Result<String> {
@@ -197,12 +200,16 @@ impl Challenge<Dns> {
 }
 
 impl Challenge<TlsAlpn> {
-    /// The `proof` is the contents of the ACME extension to be placed in the
-    /// certificate used for validation.
+    /// Returns the proof content for TLS-ALPN validation.
+    ///
+    /// Proof is to be placed in the certificate used for validation.
     pub fn tls_alpn_proof(&self) -> eyre::Result<[u8; 32]> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
-        Ok(Sha256::digest(proof).try_into().unwrap())
+
+        Ok(Sha256::digest(proof)
+            .try_into()
+            .expect("SHA-256 should produce a 32-byte output"))
     }
 }
 

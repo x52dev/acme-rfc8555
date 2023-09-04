@@ -52,6 +52,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
   docs:
+    name: Docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

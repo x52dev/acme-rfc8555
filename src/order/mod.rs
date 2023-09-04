@@ -10,13 +10,6 @@
 //!    * [`NewOrder`] -> [`CsrOrder`] -> [`CertOrder`]
 //!
 //! \* Possibly multiple auths.
-//!
-//! [`ApiOrder`]: ../api/struct.ApiOrder.html
-//! [`NewOrder`]: struct.NewOrder.html
-//! [`Auth`]: struct.Auth.html
-//! [`Challenge`]: struct.Challenge.html
-//! [`CsrOrder`]: struct.CsrOrder.html
-//! [`CertOrder`]: struct.CertOrder.html
 
 use std::{sync::Arc, time::Duration};
 
@@ -87,7 +80,7 @@ async fn api_order_of(res: reqwest::Response, want_status: &str) -> eyre::Result
     Ok(api_order)
 }
 
-/// A new order created by [`Account::new_order`].
+/// A new order created by [`Account::new_order()`].
 ///
 /// An order is created using one or many domains (a primary `CN` and possible multiple
 /// alt names). All domains in the order must have authorizations ([confirmed ownership])
@@ -100,7 +93,7 @@ async fn api_order_of(res: reqwest::Response, want_status: &str) -> eyre::Result
 /// means you might not need to prove the ownership every time. Use appropriate methods to
 /// first check whether you really need to handle authorizations.
 ///
-/// [`Account::new_order`]: ../struct.Account.html#method.new_order
+/// [`Account::new_order()`]: crate::Account::new_order()
 /// [confirmed ownership]: ../index.html#domain-ownership
 /// [CSR]: https://en.wikipedia.org/wiki/Certificate_signing_request
 pub struct NewOrder {
@@ -112,20 +105,20 @@ impl NewOrder {
     ///
     /// This doesn't do any calls against the API. You must manually call [`refresh`].
     ///
-    /// In ACME API terms, the order can either be `ready` or `valid`, which both would
-    /// mean we have passed the authorization stage.
+    /// In ACME API terms, the order can either be `ready` or `valid`, which both would mean we have
+    /// passed the authorization stage.
     ///
-    /// [`refresh`]: struct.NewOrder.html#method.refresh
+    /// [`refresh`]: Self::refresh
     pub fn is_validated(&self) -> bool {
         self.order.api_order.is_status_ready() || self.order.api_order.is_status_valid()
     }
 
-    /// If the order [`is_validated`] progress it to a [`CsrOrder`].
+    /// If the order [is validated], progress it to a [`CsrOrder`].
     ///
     /// This doesn't do any calls against the API. You must manually call [`refresh`].
     ///
-    /// [`is_validated`]: struct.NewOrder.html#method.is_validated
-    /// [`CsrOrder`]: struct.CsrOrder.html
+    /// [is validated]: Self::is_validated
+    /// [`refresh`]: Self::refresh
     pub fn confirm_validations(&self) -> Option<CsrOrder> {
         if self.is_validated() {
             Some(CsrOrder {
@@ -211,7 +204,7 @@ impl CsrOrder {
     ///
     /// This is a convenience wrapper that in turn calls the lower level [`finalize_signing_key`].
     ///
-    /// [`finalize_signing_key`]: struct.CsrOrder.html#method.finalize_signing_key
+    /// [`finalize_signing_key`]: Self::finalize_signing_key
     pub async fn finalize(self, private_key_pem: &str, delay: Duration) -> eyre::Result<CertOrder> {
         let signing_key =
             SigningKey::from_pkcs8_pem(private_key_pem).context("Error reading private key PEM")?;

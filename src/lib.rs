@@ -120,9 +120,9 @@ When creating a new order, it's possible to provide multiple alt-names that will
 be part of the certificate. The ACME API requires you to prove ownership of each such
 domain. See [`authorizations`].
 
-[`http_challenge`]: https://docs.rs/acme-lite/0.1/acme_lite/order/struct.Auth.html#method.http_challenge
-[`dns_challenge`]: https://docs.rs/acme-lite/0.1/acme_lite/order/struct.Auth.html#method.dns_challenge
-[`authorizations`]: https://docs.rs/acme-lite/0.1/acme_lite/order/struct.NewOrder.html#method.authorizations
+[`http_challenge`]: order::Auth::http_challenge()
+[`dns_challenge`]: order::Auth::dns_challenge()
+[`authorizations`]: order::NewOrder::authorizations()
 
 ## Rate limits
 

@@ -24,18 +24,16 @@ pub(crate) struct AccountInner {
 
 /// Account with an ACME provider.
 ///
-/// Accounts are created using [`Directory::account`] and consist of a contact
-/// email address and a private key for signing requests to the ACME API.
+/// Accounts are created using [`Directory::register_account()`] and consist of a contact email
+/// address and a private key for signing requests to the ACME API.
 ///
-/// acme-lib uses elliptic curve P-256 for accessing the account. This
-/// does not affect which key algorithms that can be used for the
-/// issued certificates.
+/// This library uses elliptic curve P-256 for accessing the account. This does not affect which key
+/// algorithms that can be used for the issued certificates.
 ///
-/// The advantage of using elliptic curve cryptography is that the signed
-/// requests against the ACME lib are kept small and that the public key
-/// can be derived from the private.
+/// The advantages of using elliptic curve cryptography are that the signed requests against the
+/// ACME lib are small and that the public key can be derived from the private key.
 ///
-/// [`Directory::account`]: struct.Directory.html#method.account
+/// [`Directory::register_account()`]: crate::Directory::register_account()
 #[derive(Clone)]
 pub struct Account {
     inner: Arc<AccountInner>,
@@ -113,13 +111,13 @@ impl Account {
         // convert to base64url of the DER (which is not PEM).
         let certificate = BASE64_URL_SAFE_NO_PAD.encode(cert.certificate_der()?);
 
-        let revoc = ApiRevocation {
+        let revocation = ApiRevocation {
             certificate,
             reason: reason as usize,
         };
 
         let url = &self.inner.api_directory.revoke_cert;
-        self.inner.transport.call(url, &revoc).await?;
+        self.inner.transport.call(url, &revocation).await?;
 
         Ok(())
     }
