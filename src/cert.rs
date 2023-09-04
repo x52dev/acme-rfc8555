@@ -12,25 +12,10 @@ use x509_cert::{
 };
 use zeroize::Zeroizing;
 
-/// Make an RSA private key (from which we can derive a public key).
-///
-/// This library does not check the number of bits used to create the key pair.
-/// For Let's Encrypt, the bits must be between 2048 and 4096.
-pub fn create_rsa_key(bit_size: usize) -> eyre::Result<rsa::RsaPrivateKey> {
-    let csprng = &mut rand::thread_rng();
-    Ok(rsa::RsaPrivateKey::new(csprng, bit_size)?)
-}
-
 /// Make a P-256 private key (from which we can derive a public key).
 pub fn create_p256_key() -> p256::ecdsa::SigningKey {
     let csprng = &mut rand::thread_rng();
     ecdsa::SigningKey::from(p256::SecretKey::random(csprng))
-}
-
-/// Make a P-384 private key pair (from which we can derive a public key).
-pub fn create_p384_key() -> ecdsa::SigningKey<p384::NistP384> {
-    let csprng = &mut rand::thread_rng();
-    ecdsa::SigningKey::from(p384::SecretKey::random(csprng))
 }
 
 pub(crate) fn create_csr(

@@ -10,7 +10,7 @@ issue/renew certificates.
 ```no_run
 use std::time::Duration;
 
-use acme_lite::{Certificate, Directory, DirectoryUrl, create_p384_key};
+use acme_lite::{Certificate, Directory, DirectoryUrl, create_p256_key};
 
 # #[tokio::test]
 async fn request_cert() -> eyre::Result<Certificate> {
@@ -157,6 +157,6 @@ mod test;
 
 pub use crate::{
     acc::{Account, RevocationReason},
-    cert::{create_p256_key, create_p384_key, create_rsa_key, Certificate},
+    cert::{create_p256_key, Certificate},
     dir::{Directory, DirectoryUrl},
 };
