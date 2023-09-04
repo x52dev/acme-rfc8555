@@ -61,7 +61,7 @@ jobs:
         with:
           components: rust-docs
 
-      - name: Validate Intraoc Links
+      - name: Validate Intra-doc Links
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --workspace --no-deps --all-features

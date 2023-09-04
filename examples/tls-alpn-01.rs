@@ -1,15 +1,48 @@
-use std::time::Duration;
+use std::{
+    sync::{Arc, OnceLock},
+    thread,
+    time::Duration,
+};
 
 use acme_lite::{create_p256_key, Directory, DirectoryUrl};
-use actix_files::Files;
-use actix_web::{middleware::Logger, App, HttpServer};
+use rustls::server::{Acceptor, ClientHello};
 use tokio::fs;
 
 const CHALLENGE_DIR: &str = "./acme-challenges";
 const DOMAIN_NAME: &str = "example.org";
 const CONTACT_EMAIL: &str = "contact@example.org";
 
-#[actix_web::main]
+static TOKEN: OnceLock<[u8; 32]> = OnceLock::new();
+
+fn acme_tls_server() {
+    // Start a TLS server accepting connections as they arrive.
+    let listener = std::net::TcpListener::bind(("0.0.0.0", 443)).unwrap();
+
+    for stream in listener.incoming() {
+        let mut stream = stream.unwrap();
+        let mut acceptor = Acceptor::default();
+
+        // Read TLS packets until we've consumed a full client hello and are ready to accept a
+        // connection.
+        let accepted = loop {
+            acceptor.read_tls(&mut stream).unwrap();
+            if let Some(accepted) = acceptor.accept().unwrap() {
+                break accepted;
+            }
+        };
+
+        // Generate a server config for the accepted connection, optionally customizing the
+        // configuration based on the client hello.
+        let config = acme_tls_server_config(accepted.client_hello());
+        let mut conn = accepted.into_connection(config).unwrap();
+
+        // Proceed with handling the ServerConnection
+        // Important: We do no error handling here, but you should!
+        _ = conn.complete_io(&mut stream);
+    }
+}
+
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
@@ -19,19 +52,9 @@ async fn main() -> eyre::Result<()> {
         .await
         .expect("should be able to create challenge directory");
 
-    log::info!("starting temporary HTTP challenge server");
-    let srv = HttpServer::new(|| {
-        App::new()
-            .wrap(Logger::default().log_target("acme_http_server"))
-            .service(Files::new("/.well-known/acme-challenge", CHALLENGE_DIR).show_files_listing())
-    })
-    .bind(("0.0.0.0", 80))?
-    .shutdown_timeout(0)
-    .disable_signals()
-    .run();
+    log::info!("starting temporary TLS challenge server");
 
-    let srv_handle = srv.handle();
-    let srv_task = actix_web::rt::spawn(srv);
+    let _srv_handle = thread::spawn(acme_tls_server);
 
     log::info!("fetching LetsEncrypt directory");
     // Create a directory entrypoint.
@@ -75,17 +98,13 @@ async fn main() -> eyre::Result<()> {
         // certificate for:
         //
         // http://example.org/.well-known/acme-challenge/<token>
-        let http_challenge = auth.http_challenge().unwrap();
+        let tls_challenge = auth.tls_alpn_challenge().unwrap();
 
         // The token is the filename.
-        let token = http_challenge.http_token();
-        let path = format!("{CHALLENGE_DIR}/{token}");
+        let (token, hash) = tls_challenge.tls_alpn_proof()?;
 
-        // The proof is the contents of the file.
-        let proof = http_challenge.http_proof()?;
-
-        // Place the file and contents in the correct place.
-        fs::write(path, proof).await?;
+        TOKEN.get_or_init(|| hash);
+        log::info!("{hash:?} : {token}");
 
         // After the file is accessible from the web, the calls
         // this to tell the ACME API to start checking the
@@ -95,7 +114,7 @@ async fn main() -> eyre::Result<()> {
         // confirm ownership of the domain, or fail due to the
         // not finding the proof. To see the change, we poll
         // the API with 5 seconds wait between.
-        http_challenge.validate(Duration::from_secs(5)).await?;
+        tls_challenge.validate(Duration::from_secs(5)).await?;
 
         // Update the state against the ACME API.
         new_order.refresh().await?;
@@ -117,18 +136,56 @@ async fn main() -> eyre::Result<()> {
     // Finally download the certificate.
     let cert = ord_cert.download_cert().await?;
 
-    // NOTE: Here you would spawn your HTTP server and use the private key plus
+    // NOTE: Here you would spawn your server and use the private key plus
     // certificate to configure TLS on it. For this example, we just print the
     // certificate and exit.
 
     println!("{}", cert.certificate());
 
-    // Stop temporary server for ACME challenge
-    srv_handle.stop(true).await;
-    srv_task.await??;
-
     // Delete acme-challenge dir
     fs::remove_dir_all(CHALLENGE_DIR).await?;
 
     Ok(())
+}
+
+/// Generate a server configuration for the client using the test PKI.
+///
+/// Importantly this creates a new client certificate verifier per-connection so that the server
+/// can read in the latest CRL content from disk.
+///
+/// Since the presented client certificate is not available in the `ClientHello` the server
+/// must know ahead of time which CRLs it cares about.
+fn acme_tls_server_config(_hello: ClientHello) -> Arc<rustls::ServerConfig> {
+    // Create a server end entity cert issued by the CA.
+    let mut server_ee_params = rcgen::CertificateParams::new(vec![DOMAIN_NAME.to_owned()]);
+    server_ee_params.is_ca = rcgen::IsCa::NoCa;
+    server_ee_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
+    server_ee_params.alg = &rcgen::PKCS_ECDSA_P256_SHA256;
+    server_ee_params.custom_extensions = vec![rcgen::CustomExtension::new_acme_identifier(
+        TOKEN.get().unwrap(),
+    )];
+
+    let server_cert = rcgen::Certificate::from_params(server_ee_params).unwrap();
+    let server_cert_der = server_cert.serialize_der().unwrap();
+    let server_key_der = server_cert.serialize_private_key_der();
+
+    // Build a server config using the fresh verifier. If necessary, this could be customized
+    // based on the ClientHello (e.g. selecting a different certificate, or customizing
+    // supported algorithms/protocol versions).
+    let mut server_config = rustls::ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![rustls::Certificate(server_cert_der.clone())],
+            rustls::PrivateKey(server_key_der.clone()),
+        )
+        .unwrap();
+
+    // defined in https://datatracker.ietf.org/doc/html/rfc8737#section-4
+    const ACME_ALPN: &[u8] = b"acme-tls/1";
+
+    server_config.alpn_protocols = vec![ACME_ALPN.to_vec()];
+    server_config.key_log = Arc::new(rustls::KeyLogFile::new());
+
+    Arc::new(server_config)
 }

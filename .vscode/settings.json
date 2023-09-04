@@ -8,7 +8,9 @@
         "letsencrypt",
         "oneshot",
         "pkix",
+        "rcgen",
         "reqwest",
+        "rustls",
         "subproblems",
         "ureq"
     ]

@@ -125,7 +125,7 @@ impl Auth {
     /// Returns the TLS ALPN challenge.
     ///
     /// The TLS ALPN challenge is a certificate that must be served when a request is made for the
-    /// ALPN protocol "tls-alpn-01". The certificate must contain a single DNSName SAN containing
+    /// ALPN protocol "tls-alpn-01". The certificate must contain a single dNSName SAN containing
     /// the domain being validated, as well as an ACME extension containing the SHA256 of the key
     /// authorization.
     pub fn tls_alpn_challenge(&self) -> Option<Challenge<TlsAlpn>> {
@@ -199,17 +199,20 @@ impl Challenge<Dns> {
     }
 }
 
+/// See <https://datatracker.ietf.org/doc/html/rfc8737>.
 impl Challenge<TlsAlpn> {
     /// Returns the proof content for TLS-ALPN validation.
     ///
     /// Proof is to be placed in the certificate used for validation.
-    pub fn tls_alpn_proof(&self) -> eyre::Result<[u8; 32]> {
+    pub fn tls_alpn_proof(&self) -> eyre::Result<(String, [u8; 32])> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
 
-        Ok(Sha256::digest(proof)
+        let proof_hash = Sha256::digest(&proof)
             .try_into()
-            .expect("SHA-256 should produce a 32-byte output"))
+            .expect("SHA-256 should produce a 32-byte output");
+
+        Ok((proof, proof_hash))
     }
 }
 
