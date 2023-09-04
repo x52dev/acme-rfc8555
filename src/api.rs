@@ -214,34 +214,44 @@ pub struct ApiOrder {
 }
 
 impl ApiOrder {
-    /// As long as there are outstanding authorizations.
+    pub(crate) fn from_identifiers(identifiers: Vec<ApiIdentifier>) -> Self {
+        Self {
+            identifiers,
+            ..Default::default()
+        }
+    }
+
+    /// Returns true as long as there are outstanding authorizations.
     pub fn is_status_pending(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("pending")
     }
 
-    /// When all authorizations are finished, and we need to call "finalize".
+    /// Returns true if all authorizations are finished, and we need to call "finalize".
     pub fn is_status_ready(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("ready")
     }
 
-    /// On "finalize" the server is processing to sign CSR.
+    /// Returns true during "finalize", when the server is processing our CSR.
     pub fn is_status_processing(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("processing")
     }
 
-    /// Once the certificate is issued and can be downloaded.
+    /// Returns true if the certificate is issued and can be downloaded.
     pub fn is_status_valid(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("valid")
     }
 
-    /// If the order failed and can't be used again.
+    /// Returns true if the order failed and can't be used again.
     pub fn is_status_invalid(&self) -> bool {
         self.status.as_ref().map(|s| s.as_ref()) == Some("invalid")
     }
 
     /// Returns all domains.
     pub fn domains(&self) -> Vec<&str> {
-        self.identifiers.iter().map(|i| i.value.as_ref()).collect()
+        self.identifiers
+            .iter()
+            .map(|identifier| identifier.value.as_str())
+            .collect()
     }
 }
 
@@ -253,6 +263,13 @@ pub struct ApiIdentifier {
 }
 
 impl ApiIdentifier {
+    pub(crate) fn dns(value: &str) -> Self {
+        Self {
+            _type: "dns".to_owned(),
+            value: value.to_owned(),
+        }
+    }
+
     pub fn is_type_dns(&self) -> bool {
         self._type == "dns"
     }

@@ -15,7 +15,7 @@ mod acme_key;
 
 pub(crate) use self::acme_key::AcmeKey;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct AccountInner {
     pub transport: Transport,
     pub api_account: ApiAccount,
@@ -63,14 +63,14 @@ impl Account {
 
     /// Create a new order to issue a certificate for this account.
     ///
-    /// Each order has a required `primary_name` (which will be set as the certificates `CN`)
-    /// and a variable number of `alt_names`.
+    /// Each order has a required `primary_name` (which will be set as the certificates `CN`) and a
+    /// variable number of `alt_names`.
     ///
-    /// This library doesn't constrain the number of `alt_names`, but it is limited by the ACME
-    /// API provider. Let's Encrypt [sets a max of 100 names] per certificate.
+    /// This library doesn't constrain the number of `alt_names`, but it is limited by the ACME API
+    /// provider. Let's Encrypt [sets a max of 100 names] per certificate.
     ///
-    /// Every call creates a new order with the ACME API provider, even when the domain
-    /// names supplied are exactly the same.
+    /// Every call creates a new order with the ACME API provider, even when the domain names
+    /// supplied are exactly the same.
     ///
     /// [sets a max of 100 names]: https://letsencrypt.org/docs/rate-limits/
     pub async fn new_order(
@@ -78,19 +78,10 @@ impl Account {
         primary_name: &str,
         alt_names: &[&str],
     ) -> eyre::Result<NewOrder> {
-        // construct the identifiers
         let prim_arr = [primary_name];
         let domains = prim_arr.iter().chain(alt_names);
-        let identifiers = domains
-            .map(|&domain| ApiIdentifier {
-                _type: "dns".to_owned(),
-                value: domain.to_owned(),
-            })
-            .collect();
-        let order = ApiOrder {
-            identifiers,
-            ..Default::default()
-        };
+        let identifiers = domains.map(|domain| ApiIdentifier::dns(domain)).collect();
+        let order = ApiOrder::from_identifiers(identifiers);
 
         let new_order_url = self.inner.api_directory.new_order.as_str();
 
@@ -130,7 +121,9 @@ impl Account {
 
 /// Enumeration of reasons for revocation.
 ///
-/// The reason codes are taken from [rfc5280](https://tools.ietf.org/html/rfc5280#section-5.3.1).
+/// The reason codes are taken from [RFC 5280 §5.3.1].
+///
+/// [RFC 5280 §5.3.1]: https://tools.ietf.org/html/rfc5280#section-5.3.1
 pub enum RevocationReason {
     Unspecified = 0,
     KeyCompromise = 1,

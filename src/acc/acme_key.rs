@@ -2,7 +2,7 @@ use eyre::WrapErr as _;
 use pkcs8::{DecodePrivateKey as _, EncodePrivateKey as _};
 use zeroize::Zeroizing;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct AcmeKey {
     signing_key: p256::ecdsa::SigningKey,
 
