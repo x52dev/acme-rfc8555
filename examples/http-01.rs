@@ -87,14 +87,12 @@ async fn main() -> eyre::Result<()> {
         // Place the file and contents in the correct place.
         fs::write(path, proof).await?;
 
-        // After the file is accessible from the web, the calls
-        // this to tell the ACME API to start checking the
-        // existence of the proof.
+        // After the file is accessible from the web, the `validate` call tells
+        // the ACME API to start checking the existence of the proof.
         //
-        // The order at ACME will change status to either
-        // confirm ownership of the domain, or fail due to the
-        // not finding the proof. To see the change, we poll
-        // the API with 5 seconds wait between.
+        // The order at ACME will change status to either confirm ownership of
+        // the domain, or fail due to the not finding the proof. To see the
+        // change, we poll API after 5 seconds.
         http_challenge.validate(Duration::from_secs(5)).await?;
 
         // Update the state against the ACME API.

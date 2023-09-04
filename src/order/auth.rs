@@ -204,15 +204,15 @@ impl Challenge<TlsAlpn> {
     /// Returns the proof content for TLS-ALPN validation.
     ///
     /// Proof is to be placed in the certificate used for validation.
-    pub fn tls_alpn_proof(&self) -> eyre::Result<(String, [u8; 32])> {
+    pub fn tls_alpn_proof(&self) -> eyre::Result<[u8; 32]> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
 
-        let proof_hash = Sha256::digest(&proof)
+        let proof_hash = Sha256::digest(proof)
             .try_into()
             .expect("SHA-256 should produce a 32-byte output");
 
-        Ok((proof, proof_hash))
+        Ok(proof_hash)
     }
 }
 

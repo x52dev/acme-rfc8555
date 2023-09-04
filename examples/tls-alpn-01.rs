@@ -5,14 +5,14 @@ use std::{
 };
 
 use acme_lite::{create_p256_key, Directory, DirectoryUrl};
-use rustls::server::{Acceptor, ClientHello};
+use rustls::server::Acceptor;
 use tokio::fs;
 
 const CHALLENGE_DIR: &str = "./acme-challenges";
 const DOMAIN_NAME: &str = "example.org";
 const CONTACT_EMAIL: &str = "contact@example.org";
 
-static TOKEN: OnceLock<[u8; 32]> = OnceLock::new();
+static ACME_IDENT: OnceLock<[u8; 32]> = OnceLock::new();
 
 fn acme_tls_server() {
     // Start a TLS server accepting connections as they arrive.
@@ -22,8 +22,7 @@ fn acme_tls_server() {
         let mut stream = stream.unwrap();
         let mut acceptor = Acceptor::default();
 
-        // Read TLS packets until we've consumed a full client hello and are ready to accept a
-        // connection.
+        // Read TLS packets until we are ready to accept a connection.
         let accepted = loop {
             acceptor.read_tls(&mut stream).unwrap();
             if let Some(accepted) = acceptor.accept().unwrap() {
@@ -31,13 +30,14 @@ fn acme_tls_server() {
             }
         };
 
+        let _hello = accepted.client_hello();
+
         // Generate a server config for the accepted connection, optionally customizing the
         // configuration based on the client hello.
-        let config = acme_tls_server_config(accepted.client_hello());
+        let config = acme_tls_server_config();
         let mut conn = accepted.into_connection(config).unwrap();
 
-        // Proceed with handling the ServerConnection
-        // Important: We do no error handling here, but you should!
+        // Proceed with handling the connection until the ACME client closes the connection.
         _ = conn.complete_io(&mut stream);
     }
 }
@@ -73,51 +73,40 @@ async fn main() -> eyre::Result<()> {
     let acc = dir.load_account(&signing_key_pem, Some(contact)).await?;
 
     log::info!("ordering a new TLS certificate for our domain");
-    let mut new_order = acc.new_order(DOMAIN_NAME, &[]).await?;
+    let mut order = acc.new_order(DOMAIN_NAME, &[]).await?;
 
     // If the ownership of the domain(s) have already been authorized in a previous order, you might
     // be able to skip validation. The ACME API provider decides.
     log::info!("waiting for certificate signing request to be validated");
     let ord_csr = loop {
         // Are we done?
-        if let Some(ord_csr) = new_order.confirm_validations() {
+        if let Some(ord_csr) = order.confirm_validations() {
             log::info!("certificate signing request validated");
             break ord_csr;
         }
 
         // Get the possible authorizations (for a single domain this will only be one element).
-        let auths = new_order.authorizations().await?;
+        let auths = order.authorizations().await?;
         let auth = &auths[0];
 
-        // For HTTP, the challenge is a text file that needs to be placed in your web server's root:
-        //
-        // /.well-known/acme-challenge/<token>
-        //
-        // The important thing is that it's accessible over the
-        // web for the domain(s) you are trying to get a
-        // certificate for:
-        //
-        // http://example.org/.well-known/acme-challenge/<token>
+        // For TLS, the challenge is a text file that needs to be placed in your web server's root:
         let tls_challenge = auth.tls_alpn_challenge().unwrap();
 
-        // The token is the filename.
-        let (token, hash) = tls_challenge.tls_alpn_proof()?;
+        // The ACME identifier is a 32-byte hash of the proof.
+        let acme_ident = tls_challenge.tls_alpn_proof()?;
 
-        TOKEN.get_or_init(|| hash);
-        log::info!("{hash:?} : {token}");
+        ACME_IDENT.get_or_init(|| acme_ident);
 
-        // After the file is accessible from the web, the calls
-        // this to tell the ACME API to start checking the
-        // existence of the proof.
+        // After the ID is accessible during a TLS handshake, the `validate`
+        // call tells the ACME API to start checking the existence of the proof.
         //
-        // The order at ACME will change status to either
-        // confirm ownership of the domain, or fail due to the
-        // not finding the proof. To see the change, we poll
-        // the API with 5 seconds wait between.
+        // The order will change status later to either confirm ownership of the
+        // domain, or fail due to a failed TLS handshake. To see the change,
+        // we poll the API after 5 seconds.
         tls_challenge.validate(Duration::from_secs(5)).await?;
 
         // Update the state against the ACME API.
-        new_order.refresh().await?;
+        order.refresh().await?;
     };
 
     // Ownership is proven. Create a private key for
@@ -148,36 +137,24 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
-/// Generate a server configuration for the client using the test PKI.
-///
-/// Importantly this creates a new client certificate verifier per-connection so that the server
-/// can read in the latest CRL content from disk.
-///
-/// Since the presented client certificate is not available in the `ClientHello` the server
-/// must know ahead of time which CRLs it cares about.
-fn acme_tls_server_config(_hello: ClientHello) -> Arc<rustls::ServerConfig> {
-    // Create a server end entity cert issued by the CA.
-    let mut server_ee_params = rcgen::CertificateParams::new(vec![DOMAIN_NAME.to_owned()]);
-    server_ee_params.is_ca = rcgen::IsCa::NoCa;
-    server_ee_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
-    server_ee_params.alg = &rcgen::PKCS_ECDSA_P256_SHA256;
-    server_ee_params.custom_extensions = vec![rcgen::CustomExtension::new_acme_identifier(
-        TOKEN.get().unwrap(),
+/// Generate a self-signed server configuration for the ACME negotiator.
+fn acme_tls_server_config() -> Arc<rustls::ServerConfig> {
+    let mut cert_params = rcgen::CertificateParams::new(vec![DOMAIN_NAME.to_owned()]);
+    cert_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
+    cert_params.custom_extensions = vec![rcgen::CustomExtension::new_acme_identifier(
+        ACME_IDENT.get().expect("ACME ID should be set by now"),
     )];
 
-    let server_cert = rcgen::Certificate::from_params(server_ee_params).unwrap();
-    let server_cert_der = server_cert.serialize_der().unwrap();
-    let server_key_der = server_cert.serialize_private_key_der();
+    let cert = rcgen::Certificate::from_params(cert_params).unwrap();
+    let cert_der = cert.serialize_der().unwrap();
+    let key_der = cert.serialize_private_key_der();
 
-    // Build a server config using the fresh verifier. If necessary, this could be customized
-    // based on the ClientHello (e.g. selecting a different certificate, or customizing
-    // supported algorithms/protocol versions).
     let mut server_config = rustls::ServerConfig::builder()
         .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(
-            vec![rustls::Certificate(server_cert_der.clone())],
-            rustls::PrivateKey(server_key_der.clone()),
+            vec![rustls::Certificate(cert_der.clone())],
+            rustls::PrivateKey(key_der.clone()),
         )
         .unwrap();
 
