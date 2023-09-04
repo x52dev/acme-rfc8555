@@ -196,7 +196,7 @@ impl NewOrder {
 /// * P-256 and P-384 ECDSA keys
 ///
 /// [CSR]: https://en.wikipedia.org/wiki/Certificate_signing_request
-/// [functions to create key pairs]: ../index.html#functions
+/// [functions to create private keys]: ../index.html#functions
 /// [supports]: https://letsencrypt.org/docs/integration-guide/#supported-key-algorithms
 pub struct CsrOrder {
     pub(crate) order: Order,

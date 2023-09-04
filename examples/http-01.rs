@@ -116,6 +116,11 @@ async fn main() -> eyre::Result<()> {
 
     // Finally download the certificate.
     let cert = ord_cert.download_cert().await?;
+
+    // NOTE: Here you would spawn your HTTP server and use the private key plus
+    // certificate to configure TLS on it. For this example, we just print the
+    // certificate and exit.
+
     println!("{}", cert.certificate());
 
     // Stop temporary server for ACME challenge
