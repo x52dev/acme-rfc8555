@@ -31,5 +31,10 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain.version }}
 
-      - name: Test
+      - name: Test (lib only)
+        if: matrix.toolchain.name == 'msrv'
+        run: cargo test --all-features --lib
+      
+      - name: Test (everything)
+        if: matrix.toolchain.name != 'msrv'
         run: cargo test --all-features
