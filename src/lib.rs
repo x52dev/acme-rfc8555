@@ -12,8 +12,8 @@
 //!
 //! Complete usage examples are provided in the source repository for these challenge types:
 //!
-//! - [`tls-alpn-01` &rarr;](https://github.com/x52dev/acme-lite/blob/main/examples/tls-alpn-01.rs)
-//! - [`http-01` &rarr;](https://github.com/x52dev/acme-lite/blob/main/examples/http-01.rs)
+//! - [`tls-alpn-01` &rarr;](https://github.com/x52dev/acme-rfc8555/blob/main/examples/tls-alpn-01.rs)
+//! - [`http-01` &rarr;](https://github.com/x52dev/acme-rfc8555/blob/main/examples/http-01.rs)
 //!
 //! # Domain Ownership
 //!

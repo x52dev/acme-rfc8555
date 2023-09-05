@@ -1,16 +1,16 @@
-# `acme-lite`
+# `acme-rfc8555`
 
 > Provision certificates from ACME (Automatic Certificate Management Environment) providers such as [Let's Encrypt](https://letsencrypt.org/).
 
 <!-- prettier-ignore-start -->
 
-[![crates.io](https://img.shields.io/crates/v/acme-lite?label=latest)](https://crates.io/crates/acme-lite)
-[![Documentation](https://docs.rs/acme-lite/badge.svg)](https://docs.rs/acme-lite/0.0.2)
-![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/acme-lite.svg)
+[![crates.io](https://img.shields.io/crates/v/acme-rfc8555?label=latest)](https://crates.io/crates/acme-rfc8555)
+[![Documentation](https://docs.rs/acme-rfc8555/badge.svg)](https://docs.rs/acme-rfc8555/0.0.2)
+![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/acme-rfc8555.svg)
 <br />
-[![dependency status](https://deps.rs/crate/acme-lite/0.0.2/status.svg)](https://deps.rs/crate/acme-lite/0.0.2)
-[![Download](https://img.shields.io/crates/d/acme-lite.svg)](https://crates.io/crates/acme-lite)
-[![CI](https://github.com/x52dev/acme-lite/actions/workflows/ci.yml/badge.svg)](https://github.com/x52dev/acme-lite/actions/workflows/ci.yml)
+[![dependency status](https://deps.rs/crate/acme-rfc8555/0.0.2/status.svg)](https://deps.rs/crate/acme-rfc8555/0.0.2)
+[![Download](https://img.shields.io/crates/d/acme-rfc8555.svg)](https://crates.io/crates/acme-rfc8555)
+[![CI](https://github.com/x52dev/acme-rfc8555/actions/workflows/ci.yml/badge.svg)](https://github.com/x52dev/acme-rfc8555/actions/workflows/ci.yml)
 
 <!-- prettier-ignore-end -->
 
@@ -49,9 +49,9 @@ The ACME API provider Let's Encrypt uses [rate limits] to ensure the API is not 
 
 Especially take care to use the Let's Encrypt staging environment for development where the rate limits are more relaxed. See [`DirectoryUrl::LetsEncryptStaging`].
 
-[`http_challenge`]: https://docs.rs/acme-lite/0.0.2/acme_lite/order/struct.Auth.html#method.http_challenge
-[`dns_challenge`]: https://docs.rs/acme-lite/0.0.2/acme_lite/order/struct.Auth.html#method.dns_challenge
-[`tls_alpn_challenge`]: https://docs.rs/acme-lite/0.0.2/acme_lite/order/struct.Auth.html#method.tls_alpn_challenge
-[`authorizations`]: https://docs.rs/acme-lite/0.0.2/acme_lite/order/struct.NewOrder.html#method.authorizations
+[`http_challenge`]: https://docs.rs/acme-rfc8555/0.0.2/acme_lite/order/struct.Auth.html#method.http_challenge
+[`dns_challenge`]: https://docs.rs/acme-rfc8555/0.0.2/acme_lite/order/struct.Auth.html#method.dns_challenge
+[`tls_alpn_challenge`]: https://docs.rs/acme-rfc8555/0.0.2/acme_lite/order/struct.Auth.html#method.tls_alpn_challenge
+[`authorizations`]: https://docs.rs/acme-rfc8555/0.0.2/acme_lite/order/struct.NewOrder.html#method.authorizations
 [rate limits]: https://letsencrypt.org/docs/rate-limits
-[`DirectoryUrl::LetsEncryptStaging`]: https://docs.rs/acme-lite/0.0.2/acme_lite/enum.DirectoryUrl.html#variant.LetsEncryptStaging
+[`DirectoryUrl::LetsEncryptStaging`]: https://docs.rs/acme-rfc8555/0.0.2/acme_lite/enum.DirectoryUrl.html#variant.LetsEncryptStaging

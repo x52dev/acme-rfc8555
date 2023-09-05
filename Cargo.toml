@@ -1,5 +1,5 @@
 [package]
-name = "acme-lite"
+name = "acme-rfc8555"
 version = "0.0.2"
 description = "Provision certificates from ACME providers"
 authors = [
@@ -9,7 +9,7 @@ authors = [
 ]
 categories = ["web-programming", "api-bindings"]
 keywords = ["acme", "certificate", "tls", "letsencrypt", "lets-encrypt"]
-repository = "https://github.com/x52dev/acme-lite"
+repository = "https://github.com/x52dev/acme-rfc8555"
 license = "MIT"
 edition = "2021"
 rust-version = "1.70"
