@@ -131,10 +131,11 @@
 //! Especially take care to use the Let's Encrypt staging environment for development where the rate
 //! limits are more relaxed. See [`DirectoryUrl::LetsEncryptStaging`].
 //!
-//! [rate limits]: https://letsencrypt.org/docs/rate-limits
 //! [`http_challenge`]: crate::order::Auth::http_challenge()
+//! [`tls_alpn_challenge`]: crate::order::Auth::tls_alpn_challenge()
 //! [`dns_challenge`]: crate::order::Auth::dns_challenge()
 //! [`authorizations`]: crate::order::NewOrder::authorizations()
+//! [rate limits]: https://letsencrypt.org/docs/rate-limits
 
 #![deny(rust_2018_idioms, nonstandard_style, future_incompatible)]
 
