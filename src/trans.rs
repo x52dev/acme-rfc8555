@@ -120,7 +120,7 @@ impl Transport {
                 }
 
                 // it seems we sometimes make bad JWTs. Why?!
-                if problem.is_jwt_verification_error() {
+                if problem.is_jws_verification_error() {
                     log::debug!("Retrying on: {problem}");
                     continue;
                 }

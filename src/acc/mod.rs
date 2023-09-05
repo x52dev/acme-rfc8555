@@ -102,10 +102,16 @@ impl Account {
         // convert to base64url of the DER (which is not PEM).
         let certificate = BASE64_URL_SAFE_NO_PAD.encode(cert.certificate_der()?);
 
-        let revocation = ApiRevocation {
-            certificate,
-            reason: reason as usize,
+        let reason = match reason {
+            // > the reason code CRL entry extension SHOULD be absent instead of
+            // > using the unspecified (0) reasonCode value
+            // see <https://datatracker.ietf.org/doc/html/rfc5280#section-5.3.1>
+            RevocationReason::Unspecified => None,
+
+            reason => Some(reason as usize),
         };
+
+        let revocation = ApiRevocation::new(certificate, reason);
 
         let url = &self.inner.api_directory.revoke_cert;
         self.inner.transport.call_kid(url, &revocation).await?;
@@ -113,7 +119,9 @@ impl Account {
         Ok(())
     }
 
-    /// Access the underlying JSON object for debugging.
+    /// Returns a reference to the account's API object.
+    ///
+    /// Used for debugging.
     pub fn api_account(&self) -> &ApiAccount {
         &self.inner.api_account
     }

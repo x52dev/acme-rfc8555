@@ -5,7 +5,7 @@
 use std::fmt;
 
 use serde::{
-    ser::{SerializeMap, Serializer},
+    ser::{SerializeMap as _, Serializer},
     Deserialize, Serialize,
 };
 
@@ -40,27 +40,27 @@ pub struct ApiProblem {
 }
 
 impl ApiProblem {
+    /// Returns true if problem type is "badNonce".
     pub fn is_bad_nonce(&self) -> bool {
         self._type == "badNonce"
     }
 
-    pub fn is_jwt_verification_error(&self) -> bool {
-        (self._type == "urn:acme:error:malformed"
-            || self._type == "urn:ietf:params:acme:error:malformed")
+    /// Returns true if problem details indicate that JWS verification failed.
+    pub fn is_jws_verification_error(&self) -> bool {
+        (self._type == "urn:ietf:params:acme:error:malformed"
+            || self._type == "urn:acme:error:malformed")
             && self
                 .detail
-                .as_ref()
-                .map(|s| s == "JWS verification error")
-                .unwrap_or(false)
+                .as_deref()
+                .is_some_and(|detail| detail == "JWS verification error")
     }
 }
 
 impl fmt::Display for ApiProblem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(detail) = &self.detail {
-            write!(f, "{}: {detail}", self._type)
-        } else {
-            write!(f, "{}", self._type)
+        match &self.detail {
+            Some(detail) => write!(f, "{}: {detail}", self._type),
+            _ => write!(f, "{}", self._type),
         }
     }
 }
@@ -334,30 +334,30 @@ pub struct ApiAuth {
 
 impl ApiAuth {
     pub fn is_status_pending(&self) -> bool {
-        self.status.as_ref().map(|s| s.as_ref()) == Some("pending")
+        self.status.as_deref() == Some("pending")
     }
 
     pub fn is_status_valid(&self) -> bool {
-        self.status.as_ref().map(|s| s.as_ref()) == Some("valid")
+        self.status.as_deref() == Some("valid")
     }
 
     pub fn is_status_invalid(&self) -> bool {
-        self.status.as_ref().map(|s| s.as_ref()) == Some("invalid")
+        self.status.as_deref() == Some("invalid")
     }
 
     pub fn is_status_deactivated(&self) -> bool {
-        self.status.as_ref().map(|s| s.as_ref()) == Some("deactivated")
+        self.status.as_deref() == Some("deactivated")
     }
 
     pub fn is_status_expired(&self) -> bool {
-        self.status.as_ref().map(|s| s.as_ref()) == Some("expired")
+        self.status.as_deref() == Some("expired")
     }
 
     pub fn is_status_revoked(&self) -> bool {
-        self.status.as_ref().map(|s| s.as_ref()) == Some("revoked")
+        self.status.as_deref() == Some("revoked")
     }
 
-    pub fn wildcard(&self) -> bool {
+    pub fn is_wildcard(&self) -> bool {
         self.wildcard.unwrap_or(false)
     }
 
@@ -392,32 +392,58 @@ pub struct ApiChallenge {
 //   "token": "MUi-gqeOJdRkSb_YR2eaMxQBqf6al8dgt_dOttSWb0w"
 // }
 impl ApiChallenge {
+    /// Returns true if challenge status is "pending".
     pub fn is_status_pending(&self) -> bool {
         &self.status == "pending"
     }
 
+    /// Returns true if challenge status is "processing".
     pub fn is_status_processing(&self) -> bool {
         &self.status == "processing"
     }
 
+    /// Returns true if challenge status is "valid".
     pub fn is_status_valid(&self) -> bool {
         &self.status == "valid"
     }
 
+    /// Returns true if challenge status is "invalid".
     pub fn is_status_invalid(&self) -> bool {
         &self.status == "invalid"
     }
 }
 
+/// See <https://datatracker.ietf.org/doc/html/rfc8555#section-7.4>.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiFinalize {
+    /// Certificate Signing Request (CSR) in base64url-encoded DER.
+    ///
+    /// Note: not PEM, since headers are omitted.
     pub csr: String,
 }
 
+/// See <https://datatracker.ietf.org/doc/html/rfc8555#section-7.6>.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiRevocation {
+    /// The certificate to be revoked, in the base64url-encoded version of the DER format.
+    ///
+    /// Note: not PEM, since headers are omitted.
     pub certificate: String,
-    pub reason: usize,
+
+    /// One of the revocation reasonCodes defined in [RFC 5280 §5.3.1].
+    ///
+    /// [RFC 5280 §5.3.1]: https://datatracker.ietf.org/doc/html/rfc5280#section-5.3.1
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<usize>,
+}
+
+impl ApiRevocation {
+    pub fn new(certificate: String, reason: Option<usize>) -> Self {
+        Self {
+            certificate,
+            reason,
+        }
+    }
 }
 
 #[cfg(test)]
