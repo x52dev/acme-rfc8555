@@ -1,15 +1,19 @@
 #![allow(clippy::trivial_regex)]
 
-use std::{convert::Infallible, net::TcpListener};
+use std::{convert::Infallible, net::TcpListener, sync::OnceLock};
 
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server,
 };
-use once_cell::sync::Lazy;
+use regex::Regex;
 use tokio::sync::oneshot;
 
-static RE_URL: Lazy<regex::Regex> = Lazy::new(|| regex::Regex::new("<URL>").unwrap());
+static RE_URL: OnceLock<Regex> = OnceLock::new();
+
+fn re_url() -> &'static Regex {
+    RE_URL.get_or_init(|| regex::Regex::new("<URL>").unwrap())
+}
 
 pub struct TestServer {
     pub dir_url: String,
@@ -36,7 +40,11 @@ fn get_directory(url: &str) -> Response<Body> {
     }
     }"#;
 
-    Response::new(Body::from(RE_URL.replace_all(BODY, url)))
+    Response::new(Body::from(
+        RE_URL
+            .get_or_init(|| Regex::new("<URL>").unwrap())
+            .replace_all(BODY, url),
+    ))
 }
 
 fn head_new_nonce() -> Response<Body> {
@@ -69,7 +77,7 @@ fn post_new_acct(url: &str) -> Response<Body> {
     "status": "valid"
     }"#;
 
-    let location = RE_URL
+    let location = re_url()
         .replace_all("<URL>/acme/acct/7728515", url)
         .into_owned();
 
@@ -96,14 +104,14 @@ fn post_new_order(url: &str) -> Response<Body> {
     "finalize": "<URL>/acme/finalize/7738992/18234324"
     }"#;
 
-    let location = RE_URL
+    let location = re_url()
         .replace_all("<URL>/acme/order/YTqpYUthlVfwBncUufE8", url)
         .into_owned();
 
     Response::builder()
         .status(201)
         .header("Location", location)
-        .body(Body::from(RE_URL.replace_all(BODY, url)))
+        .body(Body::from(re_url().replace_all(BODY, url)))
         .unwrap()
 }
 
@@ -124,7 +132,7 @@ fn post_get_order(url: &str) -> Response<Body> {
     "certificate": "<URL>/acme/cert/fae41c070f967713109028"
     }"#;
 
-    let body = RE_URL.replace_all(BODY, url).into_owned();
+    let body = re_url().replace_all(BODY, url).into_owned();
 
     Response::builder()
         .status(200)
@@ -164,7 +172,7 @@ fn post_authz(url: &str) -> Response<Body> {
 
     Response::builder()
         .status(201)
-        .body(Body::from(RE_URL.replace_all(BODY, url)))
+        .body(Body::from(re_url().replace_all(BODY, url)))
         .unwrap()
 }
 

@@ -12,6 +12,7 @@ keywords = ["letsencrypt", "acme"]
 repository = "https://github.com/x52dev/acme-lite"
 license = "MIT"
 edition = "2021"
+rust-version = "1.68"
 
 [dependencies]
 base64 = "0.21"
@@ -19,7 +20,6 @@ der = { version = "0.7", features = ["std", "time"] }
 ecdsa = { version = "0.16", features = ["signing", "verifying"] }
 eyre = "0.6"
 log = "0.4"
-once_cell = "1"
 p256 = { version = "0.13", features = ["pkcs8", "ecdsa-core"] }
 parking_lot = "0.12"
 pem = { package = "pem-rfc7468", version = "0.7" }
