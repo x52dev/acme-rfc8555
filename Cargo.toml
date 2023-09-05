@@ -1,18 +1,18 @@
 [package]
 name = "acme-lite"
 version = "0.0.2"
-description = "Request certificates from an ACME provider"
+description = "Provision certificates from ACME providers"
 authors = [
     "Martin Algesten <martin@algesten.se>",
     "kpcyrd <git@rxv.cc>",
     "Rob Ede <robjtede@icloud.com>",
 ]
 categories = ["web-programming", "api-bindings"]
-keywords = ["letsencrypt", "acme"]
+keywords = ["acme", "certificate", "tls", "letsencrypt", "lets-encrypt"]
 repository = "https://github.com/x52dev/acme-lite"
 license = "MIT"
 edition = "2021"
-rust-version = "1.68"
+rust-version = "1.70"
 
 [dependencies]
 base64 = "0.21"
