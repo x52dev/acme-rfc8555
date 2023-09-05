@@ -17,10 +17,9 @@
             pkgs.taplo
             pkgs.just
           ] ++ lib.optional pkgs.stdenv.isDarwin [
-            # pkgs.pkgsBuildHost.libiconv
-            # pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks.Security
-            # pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks.CoreFoundation
-            # pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks.SystemConfiguration
+            pkgs.pkgsBuildHost.libiconv
+            pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks.CoreFoundation
+            pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks.Security
           ];
         };
       };

@@ -4,12 +4,10 @@
 //! It follows the [RFC 8555](https://datatracker.ietf.org/doc/html/rfc8555) spec, using ACME v2 to
 //! issue and manage certificates.
 //!
-//! # Installation
-//!
 //! # Usage
 //!
-//! - This crate exposes a library which is referenced as `acme`. Examples throughout this
-//!   documentation use this name, not `acme_rfc855`, which would be awkward to write every time.
+//! - This crate exposes a library which is referenced as `acme`. This name is used throughout these
+//!   docs, not `acme_rfc855`, which would be awkward to write every time.
 //! - TODO
 //!
 //! ## Examples

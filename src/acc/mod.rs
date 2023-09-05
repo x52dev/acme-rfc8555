@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, iter, sync::Arc};
 
 use base64::prelude::*;
 use zeroize::Zeroizing;
@@ -77,9 +77,15 @@ impl Account {
         primary_name: &str,
         alt_names: &[&str],
     ) -> eyre::Result<NewOrder> {
-        let prim_arr = [primary_name];
-        let domains = prim_arr.iter().chain(alt_names);
-        let identifiers = domains.map(|domain| ApiIdentifier::dns(domain)).collect();
+        let domains = iter::once(&primary_name)
+            .chain(alt_names)
+            .collect::<HashSet<_>>();
+
+        let identifiers = domains
+            .into_iter()
+            .map(|&domain| ApiIdentifier::dns(domain))
+            .collect();
+
         let order = ApiOrder::from_identifiers(identifiers);
 
         let new_order_url = self.inner.api_directory.new_order.as_str();

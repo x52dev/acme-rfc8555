@@ -21,6 +21,11 @@ async fn main() -> eyre::Result<()> {
         .await
         .expect("should be able to create challenge directory");
 
+    log::info!("ensuring certificate dir exists");
+    fs::create_dir_all(CERTIFICATE_DIR)
+        .await
+        .expect("should be able to create certificate directory");
+
     log::info!("starting temporary HTTP challenge server");
     let srv = HttpServer::new(|| {
         App::new()
@@ -45,15 +50,11 @@ async fn main() -> eyre::Result<()> {
     let contact = CONTACT_EMAIL.map(|email| vec![format!("mailto:{email}")]);
 
     log::info!("generating private key and registering with ACME provider");
-    // You should write it to disk any use `load_account` afterwards.
+    // Usually, you'll write the private key to disk any use `load_account` in the future.
     let acc = dir.register_account(contact.clone()).await?;
 
-    log::info!("loading account from private key");
-    let private_key_pem = acc.acme_private_key_pem()?;
-    let acc = dir.load_account(&private_key_pem, contact).await?;
-
     log::info!("ordering a new TLS certificate for our domain");
-    let mut order = acc.new_order(DOMAINS[0], &DOMAINS[1..]).await?;
+    let mut order = acc.new_order(DOMAINS[0], DOMAINS).await?;
 
     // If the ownership of the domain(s) have already been authorized in a previous order, you might
     // be able to skip validation. The ACME API provider decides.
@@ -97,7 +98,7 @@ async fn main() -> eyre::Result<()> {
             //
             // The order at ACME will change status to either confirm ownership
             // of the domain, or fail due to the not finding the proof. To see
-            // the change, we poll API after 5 seconds.
+            // the change, we poll API every 5 seconds.
             http_challenge.validate(Duration::from_secs(5)).await?;
         }
 
