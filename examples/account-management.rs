@@ -1,6 +1,6 @@
 use std::io;
 
-use acme_lite::{Directory, DirectoryUrl};
+use acme::{Directory, DirectoryUrl};
 use tokio::fs;
 
 const ACCOUNTS_DIR: &str = "./acme-accounts";

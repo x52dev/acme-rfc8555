@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use acme_lite::{create_p256_key, Directory, DirectoryUrl};
+use acme::{create_p256_key, Directory, DirectoryUrl};
 use actix_files::Files;
 use actix_web::{middleware::Logger, App, HttpServer};
 use tokio::fs;

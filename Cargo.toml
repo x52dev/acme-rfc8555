@@ -1,6 +1,6 @@
 [package]
 name = "acme-rfc8555"
-version = "0.0.2"
+version = "0.0.3"
 description = "Provision certificates from ACME providers"
 authors = [
   "Martin Algesten <martin@algesten.se>",
@@ -17,6 +17,9 @@ rust-version = "1.70"
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+name = "acme"
 
 [dependencies]
 base64 = "0.21"

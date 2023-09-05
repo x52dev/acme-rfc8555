@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use acme_lite::{create_p256_key, Directory, DirectoryUrl};
+use acme::{create_p256_key, Directory, DirectoryUrl};
 use rustls::server::Acceptor;
 use tokio::fs;
 

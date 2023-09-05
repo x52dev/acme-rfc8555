@@ -67,11 +67,9 @@ impl Auth {
     /// The challenge will be accessed over HTTP (not HTTPS), for obvious reasons.
     ///
     /// ```no_run
-    /// use std::fs::File;
-    /// use std::io::Write;
-    /// use std::time::Duration;
+    /// use std::{fs::File, io::Write as _, time::Duration};
     ///
-    /// use acme_lite::order::Auth;
+    /// use acme::order::Auth;
     ///
     /// async fn web_authorize(auth: &Auth) -> eyre::Result<()> {
     ///   let challenge = auth.http_challenge().unwrap();
@@ -108,7 +106,7 @@ impl Auth {
     /// ```no_run
     /// use std::time::Duration;
     ///
-    /// use acme_lite::order::Auth;
+    /// use acme::order::Auth;
     ///
     /// async fn dns_authorize(auth: &Auth) -> eyre::Result<()> {
     ///   let challenge = auth.dns_challenge().unwrap();
