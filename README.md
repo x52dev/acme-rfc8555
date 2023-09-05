@@ -1,10 +1,6 @@
 # `acme-lite`
 
 > Provision certificates from ACME (Automatic Certificate Management Environment) providers such as [Let's Encrypt](https://letsencrypt.org/).
->
-> Follows the [RFC8555](https://datatracker.ietf.org/doc/html/rfc8555) spec, using ACME v2 to issue/renew certificates.
->
-> A fork of [acme-micro](https://github.com/kpcyrd/acme-micro) and [acme-lib](https://github.com/algesten/acme-lib).
 
 <!-- prettier-ignore-start -->
 
@@ -17,6 +13,10 @@
 [![CI](https://github.com/x52dev/acme-lite/actions/workflows/ci.yml/badge.svg)](https://github.com/x52dev/acme-lite/actions/workflows/ci.yml)
 
 <!-- prettier-ignore-end -->
+
+Follows the [RFC8555](https://datatracker.ietf.org/doc/html/rfc8555) spec, using ACME v2 to issue/renew certificates.
+
+Originally a fork of [acme-micro](https://github.com/kpcyrd/acme-micro) and [acme-lib](https://github.com/algesten/acme-lib), but the code has deviated significantly since then.
 
 ### Domain Ownership
 
