@@ -3,7 +3,7 @@ use std::io;
 use acme_lite::{Directory, DirectoryUrl};
 use tokio::fs;
 
-const ACCOUNT_DIR: &str = "./acme-accounts";
+const ACCOUNTS_DIR: &str = "./acme-accounts";
 
 const CONTACT_EMAIL: Option<&str> = None;
 
@@ -12,15 +12,15 @@ async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    log::info!("ensuring challenge dir exists");
-    fs::create_dir_all(ACCOUNT_DIR)
+    log::info!("ensuring accounts dir exists");
+    fs::create_dir_all(ACCOUNTS_DIR)
         .await
-        .expect("should be able to create challenge directory");
+        .expect("should be able to create accounts directory");
 
     log::info!("fetching LetsEncrypt directory");
     let dir = Directory::fetch(DirectoryUrl::LetsEncryptStaging).await?;
 
-    let key_path = format!("{ACCOUNT_DIR}/account.pem");
+    let key_path = format!("{ACCOUNTS_DIR}/account.pem");
 
     log::info!("loading signing key from disk");
     let acc = match fs::read_to_string(&key_path).await {
