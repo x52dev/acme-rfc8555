@@ -2,7 +2,7 @@
 //! such as [Let's Encrypt](https://letsencrypt.org/).
 //!
 //! It follows the [RFC 8555](https://datatracker.ietf.org/doc/html/rfc8555) spec, using ACME v2 to
-//! issue/renew certificates.
+//! issue and manage certificates.
 //!
 //! # Usage
 //!
