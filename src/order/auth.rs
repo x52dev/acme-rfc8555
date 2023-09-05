@@ -244,7 +244,7 @@ impl<A> Challenge<A> {
     ///
     /// It might already been done in a previous order for the same account.
     pub fn need_validate(&self) -> bool {
-        self.api_challenge.is_status_pending()
+        matches!(self.api_challenge.status, api::ChallengeStatus::Pending)
     }
 
     /// Tells the ACME API to attempt to validate the proof of this challenge.
