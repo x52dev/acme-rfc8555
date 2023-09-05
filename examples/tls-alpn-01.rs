@@ -86,23 +86,21 @@ async fn main() -> eyre::Result<()> {
         order.refresh().await?;
     };
 
-    // Ownership is proven. Create a private key for
-    // the certificate. These are provided for convenience, you
-    // can provide your own keypair instead if you want.
+    // Ownership is proven. Create a private key for the certificate.
+    // Alternatively you can load a private key from elsewhere.
     let private_key = create_p256_key();
 
     log::info!("submitting CSR for: {:?}", &csr.api_order().domains());
 
-    // Submit the CSR. This causes the ACME provider to enter a
-    // state of "processing" that must be polled until the
-    // certificate is either issued or rejected. Again we poll
-    // for the status change.
+    // Submit the CSR. This causes the ACME provider to enter a state of
+    // "processing" that must be polled until the certificate is either issued
+    // or rejected. Again we poll for the status change.
     let ord_cert = csr.finalize(private_key, Duration::from_secs(5)).await?;
 
     log::info!("downloading certificate");
     let cert = ord_cert.download_cert().await?;
 
-    // NOTE: Here you would spawn your server and use the private key plus
+    // NOTE: Here you would spawn your real server and use the private key plus
     // certificate to configure TLS on it. For this example, we just print the
     // certificate and exit.
 

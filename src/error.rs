@@ -1,7 +1,7 @@
-use crate::api::ApiProblem;
+use crate::api::Problem;
 
-impl From<ApiProblem> for eyre::Error {
-    fn from(err: ApiProblem) -> eyre::Error {
+impl From<Problem> for eyre::Error {
+    fn from(err: Problem) -> eyre::Error {
         eyre::eyre!("{err}")
     }
 }

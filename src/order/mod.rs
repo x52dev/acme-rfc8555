@@ -2,7 +2,7 @@
 //!
 //! An order goes through a life cycle of different states that require various actions by
 //! the user. To ensure the user only use appropriate actions, this library have simple façade
-//! structs that wraps the actual [`ApiOrder`].
+//! structs that wraps the actual [`api::Order`].
 //!
 //! 1. First prove ownership:
 //!    * [`NewOrder`] -> [`Auth`]* -> [`Challenge`]
@@ -19,7 +19,7 @@ use pkcs8::EncodePrivateKey as _;
 
 use crate::{
     acc::AccountInner,
-    api::{self, ApiAuthorization, ApiEmptyString, ApiOrder},
+    api,
     cert::{create_csr, Certificate},
 };
 
@@ -30,12 +30,12 @@ pub use self::auth::{Auth, Challenge};
 /// The order wrapped with an outer facade.
 pub(crate) struct Order {
     acc: Arc<AccountInner>,
-    api_order: ApiOrder,
+    api_order: api::Order,
     url: String,
 }
 
 impl Order {
-    pub(crate) fn new(acc: &Arc<AccountInner>, api_order: ApiOrder, url: String) -> Self {
+    pub(crate) fn new(acc: &Arc<AccountInner>, api_order: api::Order, url: String) -> Self {
         Order {
             acc: Arc::clone(acc),
             api_order,
@@ -50,7 +50,7 @@ pub(crate) async fn refresh_order(
     url: String,
     want_status: &'static str,
 ) -> eyre::Result<Order> {
-    let res = acc.transport.call_kid(&url, &ApiEmptyString).await?;
+    let res = acc.transport.call_kid(&url, &api::EmptyString).await?;
 
     // our test rig requires the order to be in `want_status`.
     // api_order_of is different for test compilation
@@ -64,20 +64,20 @@ pub(crate) async fn refresh_order(
 }
 
 #[cfg(not(test))]
-async fn api_order_of(res: reqwest::Response, _want_status: &str) -> eyre::Result<ApiOrder> {
+async fn api_order_of(res: reqwest::Response, _want_status: &str) -> eyre::Result<api::Order> {
     Ok(res.json().await?)
 }
 
 #[cfg(test)]
 // our test rig requires the order to be in `want_status`
-async fn api_order_of(res: reqwest::Response, want_status: &str) -> eyre::Result<ApiOrder> {
+async fn api_order_of(res: reqwest::Response, want_status: &str) -> eyre::Result<api::Order> {
     let body = res.text().await?;
 
     #[allow(clippy::trivial_regex)]
     let re = regex::Regex::new("<STATUS>").unwrap();
     let body = re.replace_all(&body, want_status).into_owned();
 
-    Ok(serde_json::from_str::<ApiOrder>(&body)?)
+    Ok(serde_json::from_str::<api::Order>(&body)?)
 }
 
 /// A new order created by [`Account::new_order()`].
@@ -110,7 +110,9 @@ impl NewOrder {
     ///
     /// [`refresh`]: Self::refresh
     pub fn is_validated(&self) -> bool {
-        self.order.api_order.is_status_ready() || self.order.api_order.is_status_valid()
+        self.order.api_order.status.is_some_and(|status| {
+            matches!(status, api::OrderStatus::Ready | api::OrderStatus::Valid)
+        })
     }
 
     /// If the order [is validated], progress it to a [`CsrOrder`].
@@ -156,17 +158,19 @@ impl NewOrder {
                     .order
                     .acc
                     .transport
-                    .call_kid(auth_url, &ApiEmptyString)
+                    .call_kid(auth_url, &api::EmptyString)
                     .await?;
-                let api_auth = res.json::<ApiAuthorization>().await?;
+                let api_auth = res.json::<api::Authorization>().await?;
                 result.push(Auth::new(&self.order.acc, api_auth, auth_url));
             }
         }
         Ok(result)
     }
 
-    /// Access the underlying JSON object for debugging.
-    pub fn api_order(&self) -> &ApiOrder {
+    /// Returns a reference to the order's API object.
+    ///
+    /// Useful for debugging.
+    pub fn api_order(&self) -> &api::Order {
         &self.order.api_order
     }
 }
@@ -223,7 +227,7 @@ impl CsrOrder {
         // invalid -> the whole thing is off
         let order = poll_order_finalization(&inner, &order_url, interval).await?;
 
-        if !order.api_order.is_status_valid() {
+        if !matches!(order.api_order.status, Some(api::OrderStatus::Valid)) {
             return Err(eyre::eyre!(
                 "Order is in status: {:?}",
                 order.api_order.status
@@ -233,8 +237,10 @@ impl CsrOrder {
         Ok(CertOrder { private_key, order })
     }
 
-    /// Access the underlying JSON object for debugging.
-    pub fn api_order(&self) -> &ApiOrder {
+    /// Returns a reference to the order's API object.
+    ///
+    /// Useful for debugging.
+    pub fn api_order(&self) -> &api::Order {
         &self.order.api_order
     }
 }
@@ -248,7 +254,7 @@ async fn poll_order_finalization(
     loop {
         let order = refresh_order(acc, url.to_owned(), "valid").await?;
 
-        if !order.api_order.is_status_processing() {
+        if !matches!(order.api_order.status, Some(api::OrderStatus::Processing)) {
             return Ok(order);
         }
 
@@ -273,7 +279,7 @@ impl CertOrder {
 
         let inner = self.order.acc;
 
-        let res = inner.transport.call_kid(&url, &ApiEmptyString).await?;
+        let res = inner.transport.call_kid(&url, &api::EmptyString).await?;
 
         let private_key_pem = self.private_key.to_pkcs8_pem(der::pem::LineEnding::LF)?;
 
@@ -282,8 +288,10 @@ impl CertOrder {
         Ok(Certificate::new(private_key_pem, certificate))
     }
 
-    /// Access the underlying JSON object for debugging.
-    pub fn api_order(&self) -> &ApiOrder {
+    /// Returns a reference to the order's API object.
+    ///
+    /// Useful for debugging.
+    pub fn api_order(&self) -> &api::Order {
         &self.order.api_order
     }
 }

@@ -106,9 +106,8 @@ async fn main() -> eyre::Result<()> {
         order.refresh().await?;
     };
 
-    // Ownership is proven. Create a private key for
-    // the certificate. These are provided for convenience, you
-    // can provide your own keypair instead if you want.
+    // Ownership is proven. Create a private key for the certificate.
+    // Alternatively you can load a private key from elsewhere.
     let private_key = create_p256_key();
 
     log::info!("submitting CSR for: {:?}", &csr.api_order().domains());
@@ -121,7 +120,7 @@ async fn main() -> eyre::Result<()> {
     log::info!("downloading certificate");
     let cert = ord_cert.download_cert().await?;
 
-    // NOTE: Here you would spawn your HTTP server and use the private key plus
+    // NOTE: Here you would spawn your real server and use the private key plus
     // certificate to configure TLS on it. For this example, we just persist the
     // certificate, print it, and exit.
 

@@ -5,7 +5,7 @@ use sha2::{Digest as _, Sha256};
 
 use crate::{
     acc::{AccountInner, AcmeKey},
-    api::{ApiAuthorization, ApiChallenge, ApiEmptyObject, ApiEmptyString, AuthorizationStatus},
+    api,
     jws::{Jwk, JwkThumb},
 };
 
@@ -28,14 +28,14 @@ use crate::{
 #[derive(Debug)]
 pub struct Auth {
     inner: Arc<AccountInner>,
-    api_auth: ApiAuthorization,
+    api_auth: api::Authorization,
     auth_url: String,
 }
 
 impl Auth {
     pub(crate) fn new(
         inner: &Arc<AccountInner>,
-        api_auth: ApiAuthorization,
+        api_auth: api::Authorization,
         auth_url: &str,
     ) -> Self {
         Auth {
@@ -53,7 +53,7 @@ impl Auth {
     /// Whether we actually need to do the authorization. This might not be needed if we have
     /// proven ownership of the domain recently in a previous order.
     pub fn need_challenge(&self) -> bool {
-        !matches!(self.api_auth.status, AuthorizationStatus::Valid)
+        !matches!(self.api_auth.status, api::AuthorizationStatus::Valid)
     }
 
     /// Get the http challenge.
@@ -136,34 +136,40 @@ impl Auth {
             .map(|c| Challenge::new(&self.inner, c.clone(), &self.auth_url))
     }
 
-    /// Access the underlying JSON object for debugging. We don't
-    /// refresh the authorization when the corresponding challenge is validated,
-    /// so there will be no changes to see here.
-    pub fn api_auth(&self) -> &ApiAuthorization {
+    /// Returns a reference to the authorization's API object.
+    ///
+    /// Useful for debugging.
+    ///
+    /// We don't refresh the authorization when the corresponding challenge is validated, so there
+    /// will be no changes to see here.
+    pub fn api_auth(&self) -> &api::Authorization {
         &self.api_auth
     }
 }
 
-/// Marker type for http challenges.
+/// Marker type for HTTP challenges.
 #[doc(hidden)]
 pub struct Http;
 
-/// Marker type for dns challenges.
+/// Marker type for DNS challenges.
 #[doc(hidden)]
 pub struct Dns;
 
-/// Marker type for tls alpn challenges.
+/// Marker type for TLS ALPN challenges.
 #[doc(hidden)]
 pub struct TlsAlpn;
 
 /// A DNS, HTTP, or TLS-ALPN challenge as obtained from the [`Auth`].
 pub struct Challenge<A> {
     inner: Arc<AccountInner>,
-    api_challenge: ApiChallenge,
+    api_challenge: api::Challenge,
     auth_url: String,
     _ph: std::marker::PhantomData<A>,
 }
 
+/// See [RFC 8555 §8.3].
+///
+/// [RFC 8555 §8.3]: https://datatracker.ietf.org/doc/html/rfc8555#section-8.3
 impl Challenge<Http> {
     /// Returns the token, a unique identifier of the challenge.
     ///
@@ -186,6 +192,9 @@ impl Challenge<Http> {
     }
 }
 
+/// See [RFC 8555 §8.4].
+///
+/// [RFC 8555 §8.4]: https://datatracker.ietf.org/doc/html/rfc8555#section-8.4
 impl Challenge<Dns> {
     /// Returns the proof content for DNS validation.
     ///
@@ -202,6 +211,9 @@ impl Challenge<Dns> {
 }
 
 /// See <https://datatracker.ietf.org/doc/html/rfc8737>.
+/// See [RFC 8737 §3].
+///
+/// [RFC 8737 §3]: https://datatracker.ietf.org/doc/html/rfc8737#section-3
 impl Challenge<TlsAlpn> {
     /// Returns the proof content for TLS-ALPN validation.
     ///
@@ -219,7 +231,7 @@ impl Challenge<TlsAlpn> {
 }
 
 impl<A> Challenge<A> {
-    fn new(inner: &Arc<AccountInner>, api_challenge: ApiChallenge, auth_url: &str) -> Self {
+    fn new(inner: &Arc<AccountInner>, api_challenge: api::Challenge, auth_url: &str) -> Self {
         Challenge {
             inner: inner.clone(),
             api_challenge,
@@ -228,28 +240,29 @@ impl<A> Challenge<A> {
         }
     }
 
-    /// Check whether this challenge really need validation. It might already been
-    /// done in a previous order for the same account.
+    /// Returns true if this challenge needs validation.
+    ///
+    /// It might already been done in a previous order for the same account.
     pub fn need_validate(&self) -> bool {
         self.api_challenge.is_status_pending()
     }
 
-    /// Tell the ACME API to attempt validating the proof of this challenge.
+    /// Tells the ACME API to attempt to validate the proof of this challenge.
     ///
-    /// The user must first update the DNS record or HTTP web server depending
-    /// on the type challenge being validated.
+    /// The challenge proof must be put in place before this call. Either by: placing it in a DNS
+    /// record, updating a web server, or passing it to TLS connection for ALPN exchange.
     pub async fn validate(&self, delay: Duration) -> eyre::Result<()> {
         let res = self
             .inner
             .transport
-            .call_kid(&self.api_challenge.url, &ApiEmptyObject)
+            .call_kid(&self.api_challenge.url, &api::EmptyObject)
             .await?;
 
-        let _api_challenge = res.json::<ApiChallenge>().await?;
+        let _api_challenge = res.json::<api::Challenge>().await?;
 
-        let auth = wait_for_auth_status(&self.inner, &self.auth_url, delay).await?;
+        let auth = poll_authorization_result(&self.inner, &self.auth_url, delay).await?;
 
-        if !matches!(auth.status, AuthorizationStatus::Valid) {
+        if !matches!(auth.status, api::AuthorizationStatus::Valid) {
             let error = auth
                 .challenges
                 .iter()
@@ -267,8 +280,10 @@ impl<A> Challenge<A> {
         Ok(())
     }
 
-    /// Access the underlying JSON object for debugging.
-    pub fn api_challenge(&self) -> &ApiChallenge {
+    /// Returns a reference to the challenge's API object.
+    ///
+    /// Useful for debugging.
+    pub fn api_challenge(&self) -> &api::Challenge {
         &self.api_challenge
     }
 }
@@ -290,16 +305,21 @@ fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> eyre::Re
     Ok(res)
 }
 
-async fn wait_for_auth_status(
+/// Polls the authorization status until it transitions out of the "pending" state.
+async fn poll_authorization_result(
     acc: &AccountInner,
     auth_url: &str,
     delay: Duration,
-) -> eyre::Result<ApiAuthorization> {
+) -> eyre::Result<api::Authorization> {
     let auth = loop {
-        let res = acc.transport.call_kid(auth_url, &ApiEmptyString).await?;
-        let auth = res.json::<ApiAuthorization>().await?;
+        let auth = acc
+            .transport
+            .call_kid(auth_url, &api::EmptyString)
+            .await?
+            .json::<api::Authorization>()
+            .await?;
 
-        if !matches!(auth.status, AuthorizationStatus::Pending) {
+        if !matches!(auth.status, api::AuthorizationStatus::Pending) {
             break auth;
         }
 

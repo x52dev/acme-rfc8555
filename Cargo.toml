@@ -1,6 +1,6 @@
 [package]
 name = "acme-rfc8555"
-version = "0.0.3"
+version = "0.1.0"
 description = "Provision certificates from ACME providers"
 authors = [
   "Martin Algesten <martin@algesten.se>",

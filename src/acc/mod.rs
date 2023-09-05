@@ -4,7 +4,7 @@ use base64::prelude::*;
 use zeroize::Zeroizing;
 
 use crate::{
-    api::{ApiAccount, ApiDirectory, ApiIdentifier, ApiOrder, ApiRevocation},
+    api,
     cert::Certificate,
     order::{NewOrder, Order},
     req::req_expect_header,
@@ -18,8 +18,8 @@ pub(crate) use self::acme_key::AcmeKey;
 #[derive(Debug, Clone)]
 pub(crate) struct AccountInner {
     pub transport: Transport,
-    pub api_account: ApiAccount,
-    pub api_directory: ApiDirectory,
+    pub api_account: api::Account,
+    pub api_directory: api::Directory,
 }
 
 /// Account with an ACME provider.
@@ -41,8 +41,8 @@ pub struct Account {
 impl Account {
     pub(crate) fn new(
         transport: Transport,
-        api_account: ApiAccount,
-        api_directory: ApiDirectory,
+        api_account: api::Account,
+        api_directory: api::Directory,
     ) -> Self {
         Self {
             inner: Arc::new(AccountInner {
@@ -83,16 +83,16 @@ impl Account {
 
         let identifiers = domains
             .into_iter()
-            .map(|&domain| ApiIdentifier::dns(domain))
+            .map(|&domain| api::Identifier::dns(domain))
             .collect();
 
-        let order = ApiOrder::from_identifiers(identifiers);
+        let order = api::Order::from_identifiers(identifiers);
 
         let new_order_url = self.inner.api_directory.new_order.as_str();
 
         let res = self.inner.transport.call_kid(new_order_url, &order).await?;
         let order_url = req_expect_header(&res, "location")?;
-        let api_order = res.json::<ApiOrder>().await?;
+        let api_order = res.json::<api::Order>().await?;
 
         let order = Order::new(&self.inner, api_order, order_url);
         Ok(NewOrder { order })
@@ -116,7 +116,7 @@ impl Account {
             reason => Some(reason as usize),
         };
 
-        let revocation = ApiRevocation::new(certificate, reason);
+        let revocation = api::Revocation::new(certificate, reason);
 
         let url = &self.inner.api_directory.revoke_cert;
         self.inner.transport.call_kid(url, &revocation).await?;
@@ -126,8 +126,8 @@ impl Account {
 
     /// Returns a reference to the account's API object.
     ///
-    /// Used for debugging.
-    pub fn api_account(&self) -> &ApiAccount {
+    /// Useful for debugging.
+    pub fn api_account(&self) -> &api::Account {
         &self.inner.api_account
     }
 }

@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use crate::api::ApiProblem;
+use crate::api::Problem;
 
-pub(crate) type ReqResult<T> = std::result::Result<T, ApiProblem>;
+pub(crate) type ReqResult<T> = std::result::Result<T, Problem>;
 
 pub(crate) async fn req_get(url: &str) -> reqwest::Response {
     let client = http_client();
@@ -47,7 +47,7 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
 
         log::trace!("error response body: {body}");
 
-        serde_json::from_str(&body).unwrap_or_else(|err| ApiProblem {
+        serde_json::from_str(&body).unwrap_or_else(|err| Problem {
             _type: "problemJsonFail".to_owned(),
             detail: Some(format!(
                 "Failed to deserialize application/problem+json ({err}) body: {body}"
@@ -59,7 +59,7 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
         let status = format!("{} {}", res.status(), res.status().as_str());
         let body = res.text().await.unwrap();
         let detail = format!("{status} body: {body}");
-        ApiProblem {
+        Problem {
             _type: "httpReqError".to_owned(),
             detail: Some(detail),
             subproblems: None,
@@ -73,7 +73,7 @@ pub(crate) fn req_expect_header(res: &reqwest::Response, name: &str) -> ReqResul
     res.headers()
         .get(name)
         .map(|v| v.to_str().unwrap().to_owned())
-        .ok_or_else(|| ApiProblem {
+        .ok_or_else(|| Problem {
             _type: format!("Missing header: {name}"),
             detail: None,
             subproblems: None,

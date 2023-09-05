@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     acc::AcmeKey,
-    api::{ApiAccount, ApiDirectory},
+    api,
     req::{req_expect_header, req_get, req_handle_error},
     trans::{NoncePool, Transport},
     Account,
@@ -43,14 +43,14 @@ impl<'a> DirectoryUrl<'a> {
 #[derive(Clone)]
 pub struct Directory {
     nonce_pool: Arc<NoncePool>,
-    api_directory: ApiDirectory,
+    api_directory: api::Directory,
 }
 
 impl Directory {
     /// Create a directory over a persistence implementation and directory url.
     pub async fn fetch(url: DirectoryUrl<'_>) -> eyre::Result<Directory> {
         let res = req_handle_error(req_get(url.to_url()).await).await?;
-        let api_directory = res.json::<ApiDirectory>().await?;
+        let api_directory = res.json::<api::Directory>().await?;
         let nonce_pool = Arc::new(NoncePool::new(&api_directory.new_nonce));
 
         Ok(Directory {
@@ -76,7 +76,7 @@ impl Directory {
     pub async fn load_existing_account(&self, private_key_pem: &str) -> eyre::Result<Account> {
         let acme_key = AcmeKey::from_pem(private_key_pem)?;
 
-        let acc = ApiAccount {
+        let acc = api::Account {
             only_return_existing: Some(true),
             ..Default::default()
         };
@@ -89,7 +89,7 @@ impl Directory {
 
         let kid = req_expect_header(&res, "location")?;
         log::debug!("Key ID is: {kid}");
-        let api_account = res.json::<ApiAccount>().await?;
+        let api_account = res.json::<api::Account>().await?;
 
         // fill in the server returned key ID
         transport.set_key_id(kid);
@@ -109,7 +109,7 @@ impl Directory {
         // Prepare making a call to newAccount. This is fine to do both for new
         // keys and existing. For existing the spec says to return a 200 with
         // the Location header set to the key ID (kid).
-        let acc = ApiAccount {
+        let acc = api::Account {
             // TODO: ensure email contains no hfields or more than one addr-spec in the to component
             // see https://datatracker.ietf.org/doc/html/rfc8555#section-7.3
             contact,
@@ -124,7 +124,7 @@ impl Directory {
 
         let kid = req_expect_header(&res, "location")?;
         log::debug!("Key ID is: {kid}");
-        let api_account = res.json::<ApiAccount>().await?;
+        let api_account = res.json::<api::Account>().await?;
 
         // fill in the server returned key ID
         transport.set_key_id(kid);
@@ -136,8 +136,10 @@ impl Directory {
         ))
     }
 
-    /// Access the underlying JSON object for debugging.
-    pub fn api_directory(&self) -> &ApiDirectory {
+    /// Returns a reference to the directory's API object.
+    ///
+    /// Useful for debugging.
+    pub fn api_directory(&self) -> &api::Directory {
         &self.api_directory
     }
 }
