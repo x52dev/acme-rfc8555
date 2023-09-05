@@ -51,7 +51,7 @@ pub(crate) async fn refresh_order(
     url: String,
     want_status: &'static str,
 ) -> eyre::Result<Order> {
-    let res = inner.transport.call(&url, &ApiEmptyString).await?;
+    let res = inner.transport.call_kid(&url, &ApiEmptyString).await?;
 
     // our test rig requires the order to be in `want_status`.
     // api_order_of is different for test compilation
@@ -156,7 +156,7 @@ impl NewOrder {
                     .order
                     .inner
                     .transport
-                    .call(auth_url, &ApiEmptyString)
+                    .call_kid(auth_url, &ApiEmptyString)
                     .await?;
                 let api_auth = res.json::<ApiAuth>().await?;
                 result.push(Auth::new(&self.order.inner, api_auth, auth_url));
@@ -226,10 +226,8 @@ impl CsrOrder {
         // the domains that we have authorized
         let domains = self.order.api_order.domains();
 
-        // csr from private key and authorized domains.
         let csr = create_csr(&signing_key, &domains)?;
 
-        // this is not the same as PEM.
         let csr_der = csr.to_der()?;
         let csr_enc = BASE64_URL_SAFE_NO_PAD.encode(&csr_der);
         let finalize = ApiFinalize { csr: csr_enc };
@@ -238,11 +236,11 @@ impl CsrOrder {
         let order_url = self.order.url;
         let finalize_url = &self.order.api_order.finalize;
 
-        // if the CSR is invalid, we will get a 4xx code back that
-        // bombs out from this retry_call.
-        inner.transport.call(finalize_url, &finalize).await?;
+        // If the CSR is invalid, we will get a 4xx code back that bombs out
+        // from this retry_call.
+        inner.transport.call_kid(finalize_url, &finalize).await?;
 
-        // wait for the status to not be processing.
+        // wait for the status to not be processing:
         // valid -> cert is issued
         // invalid -> the whole thing is off
         let order = wait_for_order_status(&inner, &order_url, delay).await?;
@@ -296,7 +294,7 @@ impl CertOrder {
 
         let inner = self.order.inner;
 
-        let res = inner.transport.call(&url, &ApiEmptyString).await?;
+        let res = inner.transport.call_kid(&url, &ApiEmptyString).await?;
 
         let signing_key_pem = self.signing_key.to_pkcs8_pem(der::pem::LineEnding::LF)?;
 
@@ -320,7 +318,7 @@ mod tests {
     async fn test_get_authorizations() {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await.unwrap();
+        let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
@@ -333,7 +331,7 @@ mod tests {
     async fn test_finalize() {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await.unwrap();
+        let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
@@ -352,7 +350,7 @@ mod tests {
     async fn test_download_and_save_cert() {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await.unwrap();
+        let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await

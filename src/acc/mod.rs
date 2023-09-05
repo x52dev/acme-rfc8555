@@ -85,7 +85,7 @@ impl Account {
 
         let new_order_url = self.inner.api_directory.new_order.as_str();
 
-        let res = self.inner.transport.call(new_order_url, &order).await?;
+        let res = self.inner.transport.call_kid(new_order_url, &order).await?;
         let order_url = req_expect_header(&res, "location")?;
         let api_order = res.json::<ApiOrder>().await?;
 
@@ -108,7 +108,7 @@ impl Account {
         };
 
         let url = &self.inner.api_directory.revoke_cert;
-        self.inner.transport.call(url, &revocation).await?;
+        self.inner.transport.call_kid(url, &revocation).await?;
 
         Ok(())
     }
@@ -147,7 +147,7 @@ mod tests {
         let server = crate::test::with_directory_server();
 
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await.unwrap();
+        let dir = Directory::fetch(url).await.unwrap();
 
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))

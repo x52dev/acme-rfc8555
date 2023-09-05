@@ -10,7 +10,7 @@ use tokio::fs;
 
 const CHALLENGE_DIR: &str = "./acme-challenges";
 const DOMAIN_NAME: &str = "example.org";
-const CONTACT_EMAIL: &str = "contact@example.org";
+const CONTACT_EMAIL: Option<&str> = None;
 
 static ACME_IDENT: OnceLock<[u8; 32]> = OnceLock::new();
 
@@ -59,18 +59,18 @@ async fn main() -> eyre::Result<()> {
     log::info!("fetching LetsEncrypt directory");
     // Create a directory entrypoint.
     // Note: Change to `DirectoryUrl::LetsEncrypt` in production.
-    let dir = Directory::from_url(DirectoryUrl::LetsEncryptStaging).await?;
+    let dir = Directory::fetch(DirectoryUrl::LetsEncryptStaging).await?;
 
     // Your contact addresses, note the `mailto:`
-    let contact = vec![format!("mailto:{CONTACT_EMAIL}")];
+    let contact = CONTACT_EMAIL.map(|email| vec![format!("mailto:{email}")]);
 
     log::info!("generating signing key and registering with ACME provider");
     // You should write it to disk any use `load_account` afterwards.
-    let acc = dir.register_account(Some(contact.clone())).await?;
+    let acc = dir.register_account(contact.clone()).await?;
 
     log::info!("loading account from signing key");
     let signing_key_pem = acc.acme_signing_key_pem()?;
-    let acc = dir.load_account(&signing_key_pem, Some(contact)).await?;
+    let acc = dir.load_account(&signing_key_pem, contact).await?;
 
     log::info!("ordering a new TLS certificate for our domain");
     let mut order = acc.new_order(DOMAIN_NAME, &[]).await?;
@@ -78,11 +78,11 @@ async fn main() -> eyre::Result<()> {
     // If the ownership of the domain(s) have already been authorized in a previous order, you might
     // be able to skip validation. The ACME API provider decides.
     log::info!("waiting for certificate signing request to be validated");
-    let ord_csr = loop {
+    let csr = loop {
         // Are we done?
-        if let Some(ord_csr) = order.confirm_validations() {
+        if let Some(csr) = order.confirm_validations() {
             log::info!("certificate signing request validated");
-            break ord_csr;
+            break csr;
         }
 
         // Get the possible authorizations (for a single domain this will only be one element).
@@ -95,6 +95,7 @@ async fn main() -> eyre::Result<()> {
         // The ACME identifier is a 32-byte hash of the proof.
         let acme_ident = tls_challenge.tls_alpn_proof()?;
 
+        log::info!("storing authorization proof");
         ACME_IDENT.get_or_init(|| acme_ident);
 
         // After the ID is accessible during a TLS handshake, the `validate`
@@ -114,13 +115,17 @@ async fn main() -> eyre::Result<()> {
     // can provide your own keypair instead if you want.
     let signing_key = create_p256_key();
 
+    log::info!("submitting CSR for: {:?}", &csr.api_order().domains());
+
     // Submit the CSR. This causes the ACME provider to enter a
     // state of "processing" that must be polled until the
     // certificate is either issued or rejected. Again we poll
     // for the status change.
-    let ord_cert = ord_csr
+    let ord_cert = csr
         .finalize_signing_key(signing_key, Duration::from_secs(5))
         .await?;
+
+    log::info!("downloading certificate");
 
     // Finally download the certificate.
     let cert = ord_cert.download_cert().await?;

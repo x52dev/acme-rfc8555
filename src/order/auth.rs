@@ -240,7 +240,7 @@ impl<A> Challenge<A> {
         let res = self
             .inner
             .transport
-            .call(&self.api_challenge.url, &ApiEmptyObject)
+            .call_kid(&self.api_challenge.url, &ApiEmptyObject)
             .await?;
 
         let _api_challenge = res.json::<ApiChallenge>().await?;
@@ -294,7 +294,7 @@ async fn wait_for_auth_status(
     delay: Duration,
 ) -> eyre::Result<ApiAuth> {
     let auth = loop {
-        let res = inner.transport.call(auth_url, &ApiEmptyString).await?;
+        let res = inner.transport.call_kid(auth_url, &ApiEmptyString).await?;
         let auth = res.json::<ApiAuth>().await?;
 
         if !auth.is_status_pending() {
@@ -315,7 +315,7 @@ mod tests {
     async fn test_get_challenges() {
         let server = crate::test::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await.unwrap();
+        let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await

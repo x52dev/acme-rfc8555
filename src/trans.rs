@@ -32,7 +32,7 @@ impl Transport {
         }
     }
 
-    /// Update the key id once it is known (part of setting up the transport).
+    /// Update the key ID once it is known (part of setting up the transport).
     pub fn set_key_id(&mut self, kid: String) {
         self.acme_key.set_key_id(kid);
     }
@@ -42,19 +42,42 @@ impl Transport {
         &self.acme_key
     }
 
-    /// Make call using the full jwk. Only for the first newAccount request.
+    /// Make call using the full JWS.
+    ///
+    /// Only needed for the first newAccount request.
     pub async fn call_jwk<T>(&self, url: &str, body: &T) -> eyre::Result<reqwest::Response>
     where
         T: Serialize + ?Sized,
     {
+        fn jws_with_jwk<T: Serialize + ?Sized>(
+            url: &str,
+            nonce: String,
+            key: &AcmeKey,
+            payload: &T,
+        ) -> eyre::Result<String> {
+            let jwk = Jwk::try_from(key)?;
+            let protected = JwsProtectedHeader::new_jwk(jwk, url, nonce);
+            jws_with(protected, key, payload)
+        }
+
         self.do_call(url, body, jws_with_jwk).await
     }
 
-    /// Make call using the key id
-    pub async fn call<T>(&self, url: &str, body: &T) -> eyre::Result<reqwest::Response>
+    /// Make call using the key ID.
+    pub async fn call_kid<T>(&self, url: &str, body: &T) -> eyre::Result<reqwest::Response>
     where
         T: Serialize + ?Sized,
     {
+        fn jws_with_kid<T: Serialize + ?Sized>(
+            url: &str,
+            nonce: String,
+            key: &AcmeKey,
+            payload: &T,
+        ) -> eyre::Result<String> {
+            let protected = JwsProtectedHeader::new_kid(key.key_id(), url, nonce);
+            jws_with(protected, key, payload)
+        }
+
         self.do_call(url, body, jws_with_kid).await
     }
 
@@ -158,27 +181,6 @@ impl NoncePool {
     }
 }
 
-fn jws_with_kid<T: Serialize + ?Sized>(
-    url: &str,
-    nonce: String,
-    key: &AcmeKey,
-    payload: &T,
-) -> eyre::Result<String> {
-    let protected = JwsProtectedHeader::new_kid(key.key_id(), url, nonce);
-    jws_with(protected, key, payload)
-}
-
-fn jws_with_jwk<T: Serialize + ?Sized>(
-    url: &str,
-    nonce: String,
-    key: &AcmeKey,
-    payload: &T,
-) -> eyre::Result<String> {
-    let jwk = Jwk::try_from(key)?;
-    let protected = JwsProtectedHeader::new_jwk(jwk, url, nonce);
-    jws_with(protected, key, payload)
-}
-
 /// Construct JWS with protected header according to [RFC 7515 §5.1].
 ///
 /// [RFC 7515 §5.1]: https://datatracker.ietf.org/doc/html/rfc7515#section-5.1
@@ -195,6 +197,7 @@ fn jws_with<T: Serialize + ?Sized>(
     let payload = {
         let payload_json = serde_json::to_string(payload)?;
 
+        // HACK: empty string detection is bad way to do this
         if payload_json == "\"\"" {
             // This is a special case produced by ApiEmptyString and should
             // not be further base64url encoded.

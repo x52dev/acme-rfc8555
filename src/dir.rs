@@ -48,7 +48,7 @@ pub struct Directory {
 
 impl Directory {
     /// Create a directory over a persistence implementation and directory url.
-    pub async fn from_url(url: DirectoryUrl<'_>) -> eyre::Result<Directory> {
+    pub async fn fetch(url: DirectoryUrl<'_>) -> eyre::Result<Directory> {
         let res = req_handle_error(req_get(url.to_url()).await).await?;
         let api_directory = res.json::<ApiDirectory>().await?;
         let nonce_pool = Arc::new(NoncePool::new(&api_directory.new_nonce));
@@ -78,9 +78,9 @@ impl Directory {
         acme_key: AcmeKey,
         contact: Option<Vec<String>>,
     ) -> eyre::Result<Account> {
-        // Prepare making a call to newAccount. This is fine to do both for
-        // new keys and existing. For existing the spec says to return a 200
-        // with the Location header set to the key id (kid).
+        // Prepare making a call to newAccount. This is fine to do both for new
+        // keys and existing. For existing the spec says to return a 200 with
+        // the Location header set to the key ID (kid).
         let acc = ApiAccount {
             // TODO: ensure email contains no hfields or more than one addr-spec in the to component
             // see https://datatracker.ietf.org/doc/html/rfc8555#section-7.3
@@ -98,10 +98,9 @@ impl Directory {
         log::debug!("Key ID is: {kid}");
         let api_account = res.json::<ApiAccount>().await?;
 
-        // fill in the server returned key id
+        // fill in the server returned key ID
         transport.set_key_id(kid);
 
-        // The finished account
         Ok(Account::new(
             transport,
             api_account,
@@ -124,7 +123,7 @@ mod tests {
         let server = crate::test::with_directory_server();
 
         let url = DirectoryUrl::Other(&server.dir_url);
-        let _dir = Directory::from_url(url).await.unwrap();
+        let _dir = Directory::fetch(url).await.unwrap();
     }
 
     #[tokio::test]
@@ -132,7 +131,7 @@ mod tests {
         let server = crate::test::with_directory_server();
 
         let url = DirectoryUrl::Other(&server.dir_url);
-        let dir = Directory::from_url(url).await.unwrap();
+        let dir = Directory::fetch(url).await.unwrap();
 
         let _acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
