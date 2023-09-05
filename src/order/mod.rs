@@ -21,7 +21,7 @@ use pkcs8::{DecodePrivateKey as _, EncodePrivateKey as _};
 
 use crate::{
     acc::AccountInner,
-    api::{ApiAuth, ApiEmptyString, ApiFinalize, ApiOrder},
+    api::{ApiAuthorization, ApiEmptyString, ApiFinalize, ApiOrder},
     cert::{create_csr, Certificate},
 };
 
@@ -158,7 +158,7 @@ impl NewOrder {
                     .transport
                     .call_kid(auth_url, &ApiEmptyString)
                     .await?;
-                let api_auth = res.json::<ApiAuth>().await?;
+                let api_auth = res.json::<ApiAuthorization>().await?;
                 result.push(Auth::new(&self.order.inner, api_auth, auth_url));
             }
         }

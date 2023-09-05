@@ -5,7 +5,7 @@ use sha2::{Digest as _, Sha256};
 
 use crate::{
     acc::{AccountInner, AcmeKey},
-    api::{ApiAuth, ApiChallenge, ApiEmptyObject, ApiEmptyString},
+    api::{ApiAuthorization, ApiChallenge, ApiEmptyObject, ApiEmptyString, AuthorizationStatus},
     jws::{Jwk, JwkThumb},
 };
 
@@ -28,12 +28,16 @@ use crate::{
 #[derive(Debug)]
 pub struct Auth {
     inner: Arc<AccountInner>,
-    api_auth: ApiAuth,
+    api_auth: ApiAuthorization,
     auth_url: String,
 }
 
 impl Auth {
-    pub(crate) fn new(inner: &Arc<AccountInner>, api_auth: ApiAuth, auth_url: &str) -> Self {
+    pub(crate) fn new(
+        inner: &Arc<AccountInner>,
+        api_auth: ApiAuthorization,
+        auth_url: &str,
+    ) -> Self {
         Auth {
             inner: inner.clone(),
             api_auth,
@@ -49,7 +53,7 @@ impl Auth {
     /// Whether we actually need to do the authorization. This might not be needed if we have
     /// proven ownership of the domain recently in a previous order.
     pub fn need_challenge(&self) -> bool {
-        !self.api_auth.is_status_valid()
+        !matches!(self.api_auth.status, AuthorizationStatus::Valid)
     }
 
     /// Get the http challenge.
@@ -137,7 +141,7 @@ impl Auth {
     /// Access the underlying JSON object for debugging. We don't
     /// refresh the authorization when the corresponding challenge is validated,
     /// so there will be no changes to see here.
-    pub fn api_auth(&self) -> &ApiAuth {
+    pub fn api_auth(&self) -> &ApiAuthorization {
         &self.api_auth
     }
 }
@@ -247,7 +251,7 @@ impl<A> Challenge<A> {
 
         let auth = wait_for_auth_status(&self.inner, &self.auth_url, delay).await?;
 
-        if !auth.is_status_valid() {
+        if !matches!(auth.status, AuthorizationStatus::Valid) {
             let error = auth
                 .challenges
                 .iter()
@@ -289,15 +293,15 @@ fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> eyre::Re
 }
 
 async fn wait_for_auth_status(
-    inner: &Arc<AccountInner>,
+    inner: &AccountInner,
     auth_url: &str,
     delay: Duration,
-) -> eyre::Result<ApiAuth> {
+) -> eyre::Result<ApiAuthorization> {
     let auth = loop {
         let res = inner.transport.call_kid(auth_url, &ApiEmptyString).await?;
-        let auth = res.json::<ApiAuth>().await?;
+        let auth = res.json::<ApiAuthorization>().await?;
 
-        if !auth.is_status_pending() {
+        if !matches!(auth.status, AuthorizationStatus::Pending) {
             break auth;
         }
 
