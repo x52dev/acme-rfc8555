@@ -293,12 +293,12 @@ fn key_authorization(token: &str, key: &AcmeKey, extra_sha256: bool) -> eyre::Re
 }
 
 async fn wait_for_auth_status(
-    inner: &AccountInner,
+    acc: &AccountInner,
     auth_url: &str,
     delay: Duration,
 ) -> eyre::Result<ApiAuthorization> {
     let auth = loop {
-        let res = inner.transport.call_kid(auth_url, &ApiEmptyString).await?;
+        let res = acc.transport.call_kid(auth_url, &ApiEmptyString).await?;
         let auth = res.json::<ApiAuthorization>().await?;
 
         if !matches!(auth.status, AuthorizationStatus::Pending) {

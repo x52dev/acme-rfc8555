@@ -24,11 +24,10 @@ pub(crate) struct AccountInner {
 
 /// Account with an ACME provider.
 ///
-/// Accounts are created using [`Directory::register_account()`] and consist of a contact email
+/// Accounts are created using [`Directory::register_account()`] and consists of a contact email
 /// address and a private key for signing requests to the ACME API.
 ///
-/// This library uses elliptic curve P-256 for accessing the account. This does not affect which key
-/// algorithms that can be used for the issued certificates.
+/// This library uses elliptic curve P-256 for accessing the account.
 ///
 /// The advantages of using elliptic curve cryptography are that the signed requests against the
 /// ACME lib are small and that the public key can be derived from the private key.
@@ -54,10 +53,10 @@ impl Account {
         }
     }
 
-    /// Signing key for this account.
+    /// Private key for this account.
     ///
-    /// The key is an elliptic curve signing key.
-    pub fn acme_signing_key_pem(&self) -> eyre::Result<Zeroizing<String>> {
+    /// The key is an elliptic curve private key.
+    pub fn acme_private_key_pem(&self) -> eyre::Result<Zeroizing<String>> {
         self.inner.transport.acme_key().to_pem()
     }
 

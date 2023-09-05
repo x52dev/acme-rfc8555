@@ -14,11 +14,19 @@
 
 <!-- prettier-ignore-end -->
 
-Follows the [RFC8555](https://datatracker.ietf.org/doc/html/rfc8555) spec, using ACME v2 to issue/renew certificates.
+Follows the [RFC 8555](https://datatracker.ietf.org/doc/html/rfc8555) spec, using ACME v2 to issue/renew certificates.
 
 Originally a fork of [acme-micro](https://github.com/kpcyrd/acme-micro) and [acme-lib](https://github.com/algesten/acme-lib), but the code has deviated significantly since then.
 
-### Domain Ownership
+## Crate Goals
+
+- [x] No OpenSSL
+- [x] RFC 8555 compliance
+- [ ] Full documentation
+- [ ] Full test suite
+- [ ] Support multiple certificate key types
+
+## Domain Ownership
 
 Most website TLS certificates tries to prove ownership/control over the domain they are issued for. For ACME, this means proving you control either:
 
@@ -29,7 +37,7 @@ To use this library, there are points in the flow where you would need to modify
 
 See [`tls_alpn_challenge`], [`http_challenge`], and [`dns_challenge`].
 
-#### Multiple Domains
+### Multiple Domains
 
 When creating a new order, it's possible to provide multiple alt-names that will also be part of the certificate. The ACME API requires you to prove ownership of each such domain. See [`authorizations`].
 
@@ -37,7 +45,7 @@ When creating a new order, it's possible to provide multiple alt-names that will
 
 The ACME API provider Let's Encrypt uses [rate limits] to ensure the API is not being abused. It might be tempting to put the `delay` really low in some of this library's polling calls, but balance this against the real risk of having access cut off.
 
-### Use Staging For Development!
+## Use Staging For Development!
 
 Especially take care to use the Let's Encrypt staging environment for development where the rate limits are more relaxed. See [`DirectoryUrl::LetsEncryptStaging`].
 

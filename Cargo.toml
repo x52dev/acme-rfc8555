@@ -3,9 +3,9 @@ name = "acme-lite"
 version = "0.0.2"
 description = "Provision certificates from ACME providers"
 authors = [
-    "Martin Algesten <martin@algesten.se>",
-    "kpcyrd <git@rxv.cc>",
-    "Rob Ede <robjtede@icloud.com>",
+  "Martin Algesten <martin@algesten.se>",
+  "kpcyrd <git@rxv.cc>",
+  "Rob Ede <robjtede@icloud.com>",
 ]
 categories = ["web-programming", "api-bindings"]
 keywords = ["acme", "certificate", "tls", "letsencrypt", "lets-encrypt"]
@@ -39,13 +39,13 @@ x509-cert = { version = "0.2.4", features = ["pem", "builder"] }
 zeroize = "1"
 
 [dev-dependencies]
-actix-web = "4"
 actix-files = "0.6"
+actix-web = "4"
 color-eyre = "0.6"
 env_logger = "0.10"
 # futures-util = { version = "0.3.17", default-features = false, features = ["std"] }
 hyper = { version = "0.14", features = ["server", "tcp", "http1"] }
 rcgen = "0.11"
-rustls = "0.21"
 regex = "1.4"
+rustls = "0.21"
 tokio = { version = "1.24.2", features = ["full"] }

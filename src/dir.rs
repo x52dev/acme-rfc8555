@@ -66,15 +66,15 @@ impl Directory {
 
     pub async fn load_account(
         &self,
-        signing_key_pem: &str,
+        private_key_pem: &str,
         contact: Option<Vec<String>>,
     ) -> eyre::Result<Account> {
-        let acme_key = AcmeKey::from_pem(signing_key_pem)?;
+        let acme_key = AcmeKey::from_pem(private_key_pem)?;
         self.upsert_account(acme_key, contact).await
     }
 
-    pub async fn load_existing_account(&self, signing_key_pem: &str) -> eyre::Result<Account> {
-        let acme_key = AcmeKey::from_pem(signing_key_pem)?;
+    pub async fn load_existing_account(&self, private_key_pem: &str) -> eyre::Result<Account> {
+        let acme_key = AcmeKey::from_pem(private_key_pem)?;
 
         let acc = ApiAccount {
             only_return_existing: Some(true),

@@ -18,6 +18,10 @@ pub fn create_p256_key() -> p256::ecdsa::SigningKey {
     ecdsa::SigningKey::from(p256::SecretKey::random(csprng))
 }
 
+/// Creates a CSR with `domains` and signs it with `signer`.
+///
+/// The first item of `domains` is picked for the CSR's Common Name (CN). All domains are added to a
+/// Subject Alternative Name (SAN) extension.
 pub(crate) fn create_csr(
     signer: &p256::ecdsa::SigningKey,
     domains: &[&str],
@@ -44,41 +48,41 @@ pub(crate) fn create_csr(
 /// Encapsulated certificate and private key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Certificate {
-    signing_key_pem: Zeroizing<String>,
+    private_key_pem: Zeroizing<String>,
     certificate: String,
 }
 
 impl Certificate {
-    pub(crate) fn new(signing_key_pem: Zeroizing<String>, certificate: String) -> Self {
+    pub(crate) fn new(private_key_pem: Zeroizing<String>, certificate: String) -> Self {
         Certificate {
-            signing_key_pem,
+            private_key_pem,
             certificate,
         }
     }
 
-    pub fn parse(signing_key_pem: Zeroizing<String>, certificate: String) -> eyre::Result<Self> {
+    pub fn parse(private_key_pem: Zeroizing<String>, certificate: String) -> eyre::Result<Self> {
         // validate certificate
         x509_cert::Certificate::from_pem(certificate.as_str())?;
 
         // validate private key
-        ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&signing_key_pem)?;
+        ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&private_key_pem)?;
 
         Ok(Certificate {
-            signing_key_pem,
+            private_key_pem,
             certificate,
         })
     }
 
     /// The private key in PEM format.
     pub fn private_key(&self) -> &str {
-        &self.signing_key_pem
+        &self.private_key_pem
     }
 
     /// The private key in DER encoding.
     pub fn private_key_der(&self) -> eyre::Result<Vec<u8>> {
-        let signing_key =
-            ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&self.signing_key_pem)?;
-        let der = signing_key.to_pkcs8_der()?;
+        let private_key =
+            ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&self.private_key_pem)?;
+        let der = private_key.to_pkcs8_der()?;
         Ok(der.as_bytes().to_vec())
     }
 

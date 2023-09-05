@@ -44,8 +44,8 @@ impl AcmeKey {
             .context("private_key_to_pem")
     }
 
-    /// Returns signing key.
-    pub(crate) fn signing_key(&self) -> &p256::ecdsa::SigningKey {
+    /// Returns private key.
+    pub(crate) fn private_key(&self) -> &p256::ecdsa::SigningKey {
         &self.private_key
     }
 

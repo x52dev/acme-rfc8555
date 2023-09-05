@@ -209,7 +209,7 @@ fn jws_with<T: Serialize + ?Sized>(
 
     let to_sign = format!("{header}.{payload}");
     let (signature, _rec_id) = key
-        .signing_key()
+        .private_key()
         .sign_recoverable(to_sign.as_bytes())
         .unwrap();
 

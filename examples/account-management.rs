@@ -22,22 +22,22 @@ async fn main() -> eyre::Result<()> {
 
     let key_path = format!("{ACCOUNTS_DIR}/account.pem");
 
-    log::info!("loading signing key from disk");
+    log::info!("loading private key from disk");
     let acc = match fs::read_to_string(&key_path).await {
-        Ok(signing_key_pem) => {
-            log::info!("loading account from signing key");
-            dir.load_existing_account(&signing_key_pem).await?
+        Ok(private_key_pem) => {
+            log::info!("loading account from private key");
+            dir.load_existing_account(&private_key_pem).await?
         }
 
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
             let contact = CONTACT_EMAIL.map(|email| vec![format!("mailto:{email}")]);
 
-            log::info!("generating signing key and registering with ACME provider");
+            log::info!("generating private key and registering with ACME provider");
             let acc = dir.register_account(contact).await?;
-            let signing_key_pem = acc.acme_signing_key_pem()?;
+            let private_key_pem = acc.acme_private_key_pem()?;
 
             log::info!("persisting account to {key_path}");
-            fs::write(key_path, signing_key_pem).await?;
+            fs::write(key_path, private_key_pem).await?;
 
             acc
         }

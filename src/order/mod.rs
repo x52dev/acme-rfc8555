@@ -15,30 +15,29 @@ use std::{sync::Arc, time::Duration};
 
 use base64::prelude::*;
 use der::Encode as _;
-use ecdsa::SigningKey;
-use eyre::Context as _;
-use pkcs8::{DecodePrivateKey as _, EncodePrivateKey as _};
+use pkcs8::EncodePrivateKey as _;
 
 use crate::{
     acc::AccountInner,
-    api::{ApiAuthorization, ApiEmptyString, ApiFinalize, ApiOrder},
+    api::{self, ApiAuthorization, ApiEmptyString, ApiOrder},
     cert::{create_csr, Certificate},
 };
 
 mod auth;
+
 pub use self::auth::{Auth, Challenge};
 
-/// The order wrapped with an outer façade.
+/// The order wrapped with an outer facade.
 pub(crate) struct Order {
-    inner: Arc<AccountInner>,
+    acc: Arc<AccountInner>,
     api_order: ApiOrder,
     url: String,
 }
 
 impl Order {
-    pub(crate) fn new(inner: &Arc<AccountInner>, api_order: ApiOrder, url: String) -> Self {
+    pub(crate) fn new(acc: &Arc<AccountInner>, api_order: ApiOrder, url: String) -> Self {
         Order {
-            inner: inner.clone(),
+            acc: Arc::clone(acc),
             api_order,
             url,
         }
@@ -47,18 +46,18 @@ impl Order {
 
 /// Helper to refresh an order status (POST-as-GET).
 pub(crate) async fn refresh_order(
-    inner: &Arc<AccountInner>,
+    acc: &Arc<AccountInner>,
     url: String,
     want_status: &'static str,
 ) -> eyre::Result<Order> {
-    let res = inner.transport.call_kid(&url, &ApiEmptyString).await?;
+    let res = acc.transport.call_kid(&url, &ApiEmptyString).await?;
 
     // our test rig requires the order to be in `want_status`.
     // api_order_of is different for test compilation
     let api_order = api_order_of(res, want_status).await?;
 
     Ok(Order {
-        inner: inner.clone(),
+        acc: Arc::clone(acc),
         api_order,
         url,
     })
@@ -72,12 +71,13 @@ async fn api_order_of(res: reqwest::Response, _want_status: &str) -> eyre::Resul
 #[cfg(test)]
 // our test rig requires the order to be in `want_status`
 async fn api_order_of(res: reqwest::Response, want_status: &str) -> eyre::Result<ApiOrder> {
-    let s = res.text().await?;
+    let body = res.text().await?;
+
     #[allow(clippy::trivial_regex)]
     let re = regex::Regex::new("<STATUS>").unwrap();
-    let b = re.replace_all(&s, want_status).into_owned();
-    let api_order: ApiOrder = serde_json::from_str(&b)?;
-    Ok(api_order)
+    let body = re.replace_all(&body, want_status).into_owned();
+
+    Ok(serde_json::from_str::<ApiOrder>(&body)?)
 }
 
 /// A new order created by [`Account::new_order()`].
@@ -123,7 +123,7 @@ impl NewOrder {
         if self.is_validated() {
             Some(CsrOrder {
                 order: Order::new(
-                    &self.order.inner,
+                    &self.order.acc,
                     self.order.api_order.clone(),
                     self.order.url.clone(),
                 ),
@@ -137,7 +137,7 @@ impl NewOrder {
     ///
     /// The specification calls this a "POST-as-GET" against the order URL.
     pub async fn refresh(&mut self) -> eyre::Result<()> {
-        let order = refresh_order(&self.order.inner, self.order.url.clone(), "ready").await?;
+        let order = refresh_order(&self.order.acc, self.order.url.clone(), "ready").await?;
         self.order = order;
         Ok(())
     }
@@ -154,12 +154,12 @@ impl NewOrder {
             for auth_url in authorizations {
                 let res = self
                     .order
-                    .inner
+                    .acc
                     .transport
                     .call_kid(auth_url, &ApiEmptyString)
                     .await?;
                 let api_auth = res.json::<ApiAuthorization>().await?;
-                result.push(Auth::new(&self.order.inner, api_auth, auth_url));
+                result.push(Auth::new(&self.order.acc, api_auth, auth_url));
             }
         }
         Ok(result)
@@ -173,66 +173,44 @@ impl NewOrder {
 
 /// An order that is ready for a [CSR] submission.
 ///
-/// To submit the CSR is called "finalizing" the order.
+/// Submitting the CSR is called "finalizing" the order.
 ///
-/// To finalize, the user supplies a private key (from which a public key is derived). This
-/// library provides [functions to create private keys], but the user can opt for creating them
-/// in some other way.
+/// To finalize, the user supplies a private key (from which a public key is derived). This library
+/// provides [a function to create a P-256 private key](crate::create_p256_key()) (since this is the
+/// only private key type currently supported) but it can be created or retrieved in some other way.
 ///
-/// This library makes no attempt at validating which key algorithms are used. Unsupported
-/// algorithms will show as an error when finalizing the order. It is up to the ACME API
-/// provider to decide which key algorithms to support.
-///
-/// Right now Let's Encrypt [supports]:
-///
-/// * RSA keys from 2048 to 4096 bits in length
-/// * P-256 and P-384 ECDSA keys
+/// Let's Encrypt [supports] this key type, but if an alternative ACME provider does not support
+/// this algorithm, it will show as an error when finalizing the order.
 ///
 /// [CSR]: https://en.wikipedia.org/wiki/Certificate_signing_request
-/// [functions to create private keys]: ../index.html#functions
 /// [supports]: https://letsencrypt.org/docs/integration-guide/#supported-key-algorithms
 pub struct CsrOrder {
     pub(crate) order: Order,
 }
 
 impl CsrOrder {
-    /// Finalize the order by providing a private key as PEM.
-    ///
-    /// Once the CSR has been submitted, the order goes into a `processing` status,
-    /// where we must poll until the status changes. The `delay` is the
-    /// amount of time to wait between each poll attempt.
-    ///
-    /// This is a convenience wrapper that in turn calls the lower level [`finalize_signing_key`].
-    ///
-    /// [`finalize_signing_key`]: Self::finalize_signing_key
-    pub async fn finalize(self, private_key_pem: &str, delay: Duration) -> eyre::Result<CertOrder> {
-        let signing_key =
-            SigningKey::from_pkcs8_pem(private_key_pem).context("Error reading private key PEM")?;
-        self.finalize_signing_key(signing_key, delay).await
-    }
-
-    /// Lower level finalize call that works directly with the openssl crate structures.
+    /// Finalizes the order by submitting a CSR and awaiting certificate issuance.
     ///
     /// Creates the CSR for the domains in the order and submit it to the ACME API.
     ///
-    /// Once the CSR has been submitted, the order goes into a `processing` status,
-    /// where we must poll until the status changes. The `delay` is the
-    /// amount of time to wait between each poll attempt.
-    pub async fn finalize_signing_key(
+    /// Once the CSR has been submitted, the order goes into a "processing" status, where we must
+    /// poll until the status changes to "valid"; `interval` is the amount of time to wait between
+    /// each poll attempt.
+    pub async fn finalize(
         self,
-        signing_key: p256::ecdsa::SigningKey,
-        delay: Duration,
+        private_key: p256::ecdsa::SigningKey,
+        interval: Duration,
     ) -> eyre::Result<CertOrder> {
         // the domains that we have authorized
         let domains = self.order.api_order.domains();
 
-        let csr = create_csr(&signing_key, &domains)?;
+        let csr = create_csr(&private_key, &domains)?;
 
         let csr_der = csr.to_der()?;
-        let csr_enc = BASE64_URL_SAFE_NO_PAD.encode(&csr_der);
-        let finalize = ApiFinalize { csr: csr_enc };
+        let csr_b64 = BASE64_URL_SAFE_NO_PAD.encode(&csr_der);
+        let finalize = api::Finalize::new(csr_b64);
 
-        let inner = self.order.inner;
+        let inner = self.order.acc;
         let order_url = self.order.url;
         let finalize_url = &self.order.api_order.finalize;
 
@@ -243,7 +221,7 @@ impl CsrOrder {
         // wait for the status to not be processing:
         // valid -> cert is issued
         // invalid -> the whole thing is off
-        let order = wait_for_order_status(&inner, &order_url, delay).await?;
+        let order = poll_order_finalization(&inner, &order_url, interval).await?;
 
         if !order.api_order.is_status_valid() {
             return Err(eyre::eyre!(
@@ -252,7 +230,7 @@ impl CsrOrder {
             ));
         }
 
-        Ok(CertOrder { signing_key, order })
+        Ok(CertOrder { private_key, order })
     }
 
     /// Access the underlying JSON object for debugging.
@@ -261,25 +239,26 @@ impl CsrOrder {
     }
 }
 
-async fn wait_for_order_status(
-    inner: &Arc<AccountInner>,
+/// Polls the order status until it transitions out of the "processing" state.
+async fn poll_order_finalization(
+    acc: &Arc<AccountInner>,
     url: &str,
-    delay: Duration,
+    interval: Duration,
 ) -> eyre::Result<Order> {
     loop {
-        let order = refresh_order(inner, url.to_owned(), "valid").await?;
+        let order = refresh_order(acc, url.to_owned(), "valid").await?;
 
         if !order.api_order.is_status_processing() {
             return Ok(order);
         }
 
-        tokio::time::sleep(delay).await;
+        tokio::time::sleep(interval).await;
     }
 }
 
 /// Order for an issued certificate that is ready to download.
 pub struct CertOrder {
-    signing_key: p256::ecdsa::SigningKey,
+    private_key: p256::ecdsa::SigningKey,
     order: Order,
 }
 
@@ -292,15 +271,15 @@ impl CertOrder {
             .certificate
             .ok_or_else(|| eyre::eyre!("certificate url"))?;
 
-        let inner = self.order.inner;
+        let inner = self.order.acc;
 
         let res = inner.transport.call_kid(&url, &ApiEmptyString).await?;
 
-        let signing_key_pem = self.signing_key.to_pkcs8_pem(der::pem::LineEnding::LF)?;
+        let private_key_pem = self.private_key.to_pkcs8_pem(der::pem::LineEnding::LF)?;
 
         let certificate = res.text().await?;
 
-        Ok(Certificate::new(signing_key_pem, certificate))
+        Ok(Certificate::new(private_key_pem, certificate))
     }
 
     /// Access the underlying JSON object for debugging.
@@ -323,7 +302,7 @@ mod tests {
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
             .unwrap();
-        let ord = acc.new_order("acmetest.example.com", &[]).await.unwrap();
+        let ord = acc.new_order("acme-test.example.com", &[]).await.unwrap();
         let _authorizations = ord.authorizations().await.unwrap();
     }
 
@@ -336,12 +315,12 @@ mod tests {
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
             .unwrap();
-        let ord = acc.new_order("acmetest.example.com", &[]).await.unwrap();
+        let ord = acc.new_order("acme-test.example.com", &[]).await.unwrap();
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
-        let signing_key = cert::create_p256_key();
+        let private_key = cert::create_p256_key();
         let _ord = ord
-            .finalize_signing_key(signing_key, Duration::from_millis(1))
+            .finalize(private_key, Duration::from_millis(1))
             .await
             .unwrap();
     }
@@ -355,13 +334,13 @@ mod tests {
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
             .unwrap();
-        let ord = acc.new_order("acmetest.example.com", &[]).await.unwrap();
+        let ord = acc.new_order("acme-test.example.com", &[]).await.unwrap();
 
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
-        let signing_key = cert::create_p256_key();
+        let private_key = cert::create_p256_key();
         let ord = ord
-            .finalize_signing_key(signing_key, Duration::from_millis(1))
+            .finalize(private_key, Duration::from_millis(1))
             .await
             .unwrap();
 

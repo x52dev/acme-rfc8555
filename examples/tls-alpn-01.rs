@@ -66,13 +66,13 @@ async fn main() -> eyre::Result<()> {
     // Your contact addresses, note the `mailto:`
     let contact = CONTACT_EMAIL.map(|email| vec![format!("mailto:{email}")]);
 
-    log::info!("generating signing key and registering with ACME provider");
+    log::info!("generating private key and registering with ACME provider");
     // You should write it to disk any use `load_account` afterwards.
     let acc = dir.register_account(contact.clone()).await?;
 
-    log::info!("loading account from signing key");
-    let signing_key_pem = acc.acme_signing_key_pem()?;
-    let acc = dir.load_account(&signing_key_pem, contact).await?;
+    log::info!("loading account from private key");
+    let private_key_pem = acc.acme_private_key_pem()?;
+    let acc = dir.load_account(&private_key_pem, contact).await?;
 
     log::info!("ordering a new TLS certificate for our domain");
     let mut order = acc.new_order(DOMAIN, &[]).await?;
@@ -104,8 +104,8 @@ async fn main() -> eyre::Result<()> {
         // call tells the ACME API to start checking the existence of the proof.
         //
         // The order will change status later to either confirm ownership of the
-        // domain, or fail due to a failed TLS handshake. To see the change,
-        // we poll the API after 5 seconds.
+        // domain, or fail due to a failed TLS handshake. To see the change, we
+        // poll the API after 5 seconds.
         tls_challenge.validate(Duration::from_secs(5)).await?;
 
         // Update the state against the ACME API.
@@ -115,7 +115,7 @@ async fn main() -> eyre::Result<()> {
     // Ownership is proven. Create a private key for
     // the certificate. These are provided for convenience, you
     // can provide your own keypair instead if you want.
-    let signing_key = create_p256_key();
+    let private_key = create_p256_key();
 
     log::info!("submitting CSR for: {:?}", &csr.api_order().domains());
 
@@ -123,13 +123,9 @@ async fn main() -> eyre::Result<()> {
     // state of "processing" that must be polled until the
     // certificate is either issued or rejected. Again we poll
     // for the status change.
-    let ord_cert = csr
-        .finalize_signing_key(signing_key, Duration::from_secs(5))
-        .await?;
+    let ord_cert = csr.finalize(private_key, Duration::from_secs(5)).await?;
 
     log::info!("downloading certificate");
-
-    // Finally download the certificate.
     let cert = ord_cert.download_cert().await?;
 
     // NOTE: Here you would spawn your server and use the private key plus

@@ -100,7 +100,7 @@ impl TryFrom<&AcmeKey> for Jwk {
     type Error = eyre::Error;
 
     fn try_from(a: &AcmeKey) -> eyre::Result<Self> {
-        let point = a.signing_key().verifying_key().to_encoded_point(false);
+        let point = a.private_key().verifying_key().to_encoded_point(false);
 
         let x = point.x().unwrap();
         let y = point.y().unwrap();
