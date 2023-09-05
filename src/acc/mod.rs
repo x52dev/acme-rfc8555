@@ -34,7 +34,7 @@ pub(crate) struct AccountInner {
 /// ACME lib are small and that the public key can be derived from the private key.
 ///
 /// [`Directory::register_account()`]: crate::Directory::register_account()
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Account {
     inner: Arc<AccountInner>,
 }
@@ -45,7 +45,7 @@ impl Account {
         api_account: ApiAccount,
         api_directory: ApiDirectory,
     ) -> Self {
-        Account {
+        Self {
             inner: Arc::new(AccountInner {
                 transport,
                 api_account,

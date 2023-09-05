@@ -9,7 +9,9 @@ use rustls::server::Acceptor;
 use tokio::fs;
 
 const CHALLENGE_DIR: &str = "./acme-challenges";
-const DOMAIN_NAME: &str = "example.org";
+const CERTIFICATE_DIR: &str = "./acme-certificates";
+
+const DOMAIN: &str = "example.org";
 const CONTACT_EMAIL: Option<&str> = None;
 
 static ACME_IDENT: OnceLock<[u8; 32]> = OnceLock::new();
@@ -73,7 +75,7 @@ async fn main() -> eyre::Result<()> {
     let acc = dir.load_account(&signing_key_pem, contact).await?;
 
     log::info!("ordering a new TLS certificate for our domain");
-    let mut order = acc.new_order(DOMAIN_NAME, &[]).await?;
+    let mut order = acc.new_order(DOMAIN, &[]).await?;
 
     // If the ownership of the domain(s) have already been authorized in a previous order, you might
     // be able to skip validation. The ACME API provider decides.
@@ -134,17 +136,23 @@ async fn main() -> eyre::Result<()> {
     // certificate to configure TLS on it. For this example, we just print the
     // certificate and exit.
 
-    println!("{}", cert.certificate());
+    let cert_path = format!("{CERTIFICATE_DIR}/{}.pem", DOMAIN);
+    log::info!("persisting certificate to {cert_path}");
+    fs::write(cert_path, cert.certificate()).await?;
 
-    // Delete acme-challenge dir
-    fs::remove_dir_all(CHALLENGE_DIR).await?;
+    let key_path = format!("{CERTIFICATE_DIR}/{}.key", DOMAIN);
+    log::info!("persisting private key to {key_path}");
+    fs::write(key_path, cert.private_key()).await?;
+
+    println!();
+    println!("{}", cert.certificate());
 
     Ok(())
 }
 
 /// Generate a self-signed server configuration for the ACME negotiator.
 fn acme_tls_server_config() -> Arc<rustls::ServerConfig> {
-    let mut cert_params = rcgen::CertificateParams::new(vec![DOMAIN_NAME.to_owned()]);
+    let mut cert_params = rcgen::CertificateParams::new(vec![DOMAIN.to_owned()]);
     cert_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
     cert_params.custom_extensions = vec![rcgen::CustomExtension::new_acme_identifier(
         ACME_IDENT.get().expect("ACME ID should be set by now"),

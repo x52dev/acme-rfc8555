@@ -69,12 +69,12 @@ impl Certificate {
         })
     }
 
-    /// The PEM encoded private key.
+    /// The private key in PEM format.
     pub fn private_key(&self) -> &str {
         &self.signing_key_pem
     }
 
-    /// The private key as DER.
+    /// The private key in DER encoding.
     pub fn private_key_der(&self) -> eyre::Result<Vec<u8>> {
         let signing_key =
             ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&self.signing_key_pem)?;
@@ -82,12 +82,12 @@ impl Certificate {
         Ok(der.as_bytes().to_vec())
     }
 
-    /// The PEM encoded issued certificate.
+    /// The issued certificate in PEM format.
     pub fn certificate(&self) -> &str {
         &self.certificate
     }
 
-    /// The issued certificate as DER.
+    /// The issued certificate in DER encoding.
     pub fn certificate_der(&self) -> eyre::Result<Vec<u8>> {
         let x509 = x509_cert::Certificate::from_pem(&self.certificate)?;
         x509.to_der().context("der")

@@ -18,7 +18,7 @@ use crate::{
 /// 2. `call_jwk()` against newAccount url
 /// 3. `set_key_id` from the returned `Location` header.
 /// 4. `call()` for all calls after that.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Transport {
     acme_key: AcmeKey,
     nonce_pool: Arc<NoncePool>,
@@ -44,7 +44,7 @@ impl Transport {
 
     /// Make call using the full JWS.
     ///
-    /// Only needed for the first newAccount request.
+    /// Needed for the first newAccount request.
     pub async fn call_jwk<T>(&self, url: &str, body: &T) -> eyre::Result<reqwest::Response>
     where
         T: Serialize + ?Sized,
@@ -132,7 +132,7 @@ impl Transport {
 }
 
 /// Shared pool of nonces.
-#[derive(Default, Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct NoncePool {
     nonce_url: String,
     pool: Mutex<VecDeque<String>>,

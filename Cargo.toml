@@ -14,6 +14,10 @@ license = "MIT"
 edition = "2021"
 rust-version = "1.70"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [dependencies]
 base64 = "0.21"
 der = { version = "0.7", features = ["std", "time"] }

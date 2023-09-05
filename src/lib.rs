@@ -11,27 +11,26 @@
 //!
 //! use acme_lite::{Certificate, Directory, DirectoryUrl, create_p256_key};
 //!
-//! # #[tokio::test]
 //! async fn request_cert() -> eyre::Result<Certificate> {
 //!     // Use `DirectoryUrl::LetsEncrypt` for production.
 //!     let url = DirectoryUrl::LetsEncryptStaging;
 //!
 //!     // Create a directory entrypoint.
-//!     let dir = Directory::from_url(url).await?;
+//!     let dir = Directory::fetch(url).await?;
 //!
 //!     // Your contact addresses, note the `mailto:`
 //!     let contact = vec!["mailto:foo@bar.com".to_owned()];
 //!
 //!     // Generate a private key and register an account with your ACME provider.
 //!     // You should write it to disk any use `load_account` afterwards.
-//!     let acc = dir.register_account(Some(contact.clone()))?;
+//!     let acc = dir.register_account(Some(contact.clone())).await?;
 //!
 //!     // Example of how to load an account from string:
-//!     let singing_key = acc.acme_private_key_pem()?;
-//!     let acc = dir.load_account(&singing_key, Some(contact))?;
+//!     let singing_key = acc.acme_signing_key_pem()?;
+//!     let acc = dir.load_account(&singing_key, Some(contact)).await?;
 //!
 //!     // Order a new TLS certificate for a domain.
-//!     let mut ord_new = acc.new_order("example.org", &[])?;
+//!     let mut ord_new = acc.new_order("example.org", &[]).await?;
 //!
 //!     // If the ownership of the domain(s) have already been
 //!     // authorized in a previous order, you might be able to
@@ -44,7 +43,7 @@
 //!
 //!         // Get the possible authorizations (for a single domain
 //!         // this will only be one element).
-//!         let auths = ord_new.authorizations()?;
+//!         let auths = ord_new.authorizations().await?;
 //!
 //!         // For HTTP, the challenge is a text file that needs to
 //!         // be placed in your web server's root:
@@ -76,10 +75,10 @@
 //!         // confirm ownership of the domain, or fail due to the
 //!         // not finding the proof. To see the change, we poll
 //!         // the API with 5000 milliseconds wait between.
-//!         challenge.validate(Duration::from_millis(5000))?;
+//!         challenge.validate(Duration::from_millis(5000)).await?;
 //!
 //!         // Update the state against the ACME API.
-//!         ord_new.refresh()?;
+//!         ord_new.refresh().await?;
 //!     };
 //!
 //!     // Ownership is proven. Create a private key for

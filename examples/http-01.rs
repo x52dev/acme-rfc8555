@@ -6,6 +6,8 @@ use actix_web::{middleware::Logger, App, HttpServer};
 use tokio::fs;
 
 const CHALLENGE_DIR: &str = "./acme-challenges";
+const CERTIFICATE_DIR: &str = "./acme-certificates";
+
 const DOMAINS: &[&str] = &["glados.x52.dev", "oc.x52.dev"];
 const CONTACT_EMAIL: Option<&str> = None;
 
@@ -123,17 +125,23 @@ async fn main() -> eyre::Result<()> {
     let cert = ord_cert.download_cert().await?;
 
     // NOTE: Here you would spawn your HTTP server and use the private key plus
-    // certificate to configure TLS on it. For this example, we just print the
-    // certificate and exit.
+    // certificate to configure TLS on it. For this example, we just persist the
+    // certificate, print it, and exit.
 
+    let cert_path = format!("{CERTIFICATE_DIR}/{}.pem", DOMAINS.first().unwrap());
+    log::info!("persisting certificate to {cert_path}");
+    fs::write(cert_path, cert.certificate()).await?;
+
+    let key_path = format!("{CERTIFICATE_DIR}/{}.key", DOMAINS.first().unwrap());
+    log::info!("persisting private key to {key_path}");
+    fs::write(key_path, cert.private_key()).await?;
+
+    println!();
     println!("{}", cert.certificate());
 
     // Stop temporary ACME server.
     srv_handle.stop(true).await;
     srv_task.await??;
-
-    // Delete challenge dir.
-    fs::remove_dir_all(CHALLENGE_DIR).await?;
 
     Ok(())
 }

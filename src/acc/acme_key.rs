@@ -4,48 +4,49 @@ use zeroize::Zeroizing;
 
 #[derive(Debug, Clone)]
 pub(crate) struct AcmeKey {
-    /// Signing key for ACME API interactions.
-    signing_key: p256::ecdsa::SigningKey,
+    /// Private key for ACME API interactions.
+    private_key: p256::ecdsa::SigningKey,
 
     /// Key ID that is set once an ACME account is created.
     key_id: Option<String>,
 }
 
 impl AcmeKey {
-    /// Constructs new ACME key with random signing key.
+    /// Constructs new ACME key with random private key.
     pub(crate) fn new() -> AcmeKey {
         Self::from_key(crate::create_p256_key())
     }
 
-    /// Constructs new ACME key from PEM-encoded signing key.
+    /// Constructs new ACME key from PEM-encoded private key.
     ///
     /// No key ID is set.
     pub(crate) fn from_pem(pem: &str) -> eyre::Result<AcmeKey> {
-        let pri_key = ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(pem)
+        let private_key = ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(pem)
             .context("Failed to read PEM")?;
-        Ok(Self::from_key(pri_key))
+
+        Ok(Self::from_key(private_key))
     }
 
-    /// Constructs new ACME key from signing key.
+    /// Constructs new ACME key from private key.
     ///
     /// No key ID is set.
-    fn from_key(signing_key: p256::ecdsa::SigningKey) -> AcmeKey {
+    fn from_key(private_key: p256::ecdsa::SigningKey) -> AcmeKey {
         AcmeKey {
-            signing_key,
+            private_key,
             key_id: None,
         }
     }
 
-    /// Returns PEM-encoded signing key.
+    /// Returns PEM-encoded private key.
     pub(crate) fn to_pem(&self) -> eyre::Result<Zeroizing<String>> {
-        self.signing_key
+        self.private_key
             .to_pkcs8_pem(pem::LineEnding::LF)
             .context("private_key_to_pem")
     }
 
     /// Returns signing key.
     pub(crate) fn signing_key(&self) -> &p256::ecdsa::SigningKey {
-        &self.signing_key
+        &self.private_key
     }
 
     /// Return key ID.

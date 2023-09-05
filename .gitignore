@@ -4,5 +4,7 @@
 *.crt
 Cargo.lock
 
-# challenge dir for examples
-acme-challenges/
+# temp dirs for examples
+/acme-accounts/
+/acme-challenges/
+/acme-certificates/

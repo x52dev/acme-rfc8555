@@ -73,6 +73,34 @@ impl Directory {
         self.upsert_account(acme_key, contact).await
     }
 
+    pub async fn load_existing_account(&self, signing_key_pem: &str) -> eyre::Result<Account> {
+        let acme_key = AcmeKey::from_pem(signing_key_pem)?;
+
+        let acc = ApiAccount {
+            only_return_existing: Some(true),
+            ..Default::default()
+        };
+
+        let mut transport = Transport::new(Arc::clone(&self.nonce_pool), acme_key);
+
+        let res = transport
+            .call_jwk(&self.api_directory.new_account, &acc)
+            .await?;
+
+        let kid = req_expect_header(&res, "location")?;
+        log::debug!("Key ID is: {kid}");
+        let api_account = res.json::<ApiAccount>().await?;
+
+        // fill in the server returned key ID
+        transport.set_key_id(kid);
+
+        Ok(Account::new(
+            transport,
+            api_account,
+            self.api_directory.clone(),
+        ))
+    }
+
     async fn upsert_account(
         &self,
         acme_key: AcmeKey,
