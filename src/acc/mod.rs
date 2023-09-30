@@ -77,14 +77,13 @@ impl Account {
         primary_name: &str,
         alt_names: &[&str],
     ) -> eyre::Result<NewOrder> {
-        let domains = iter::once(&primary_name)
-            .chain(alt_names)
-            .collect::<HashSet<_>>();
-
-        let identifiers = domains
-            .into_iter()
-            .map(|&domain| api::Identifier::dns(domain))
-            .collect();
+        let mut identifiers = Vec::new();
+        let mut dedup = HashSet::new();
+        for domain in iter::once(primary_name).chain(alt_names.iter().copied()) {
+            if dedup.insert(domain) {
+                identifiers.push(api::Identifier::dns(domain));
+            }
+        }
 
         let order = api::Order::from_identifiers(identifiers);
 
