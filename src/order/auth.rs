@@ -342,7 +342,7 @@ mod tests {
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
             .unwrap();
-        let ord = acc.new_order("acmetest.example.com", &[]).await.unwrap();
+        let ord = acc.new_order("acme-test.example.com", &[]).await.unwrap();
         let authz = ord.authorizations().await.unwrap();
         assert!(authz.len() == 1);
         let auth = &authz[0];

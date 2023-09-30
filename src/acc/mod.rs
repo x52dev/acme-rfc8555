@@ -93,7 +93,8 @@ impl Account {
         let order_url = req_expect_header(&res, "location")?;
         let api_order = res.json::<api::Order>().await?;
 
-        let order = Order::new(&self.inner, api_order, order_url);
+        let mut order = Order::new(&self.inner, order, order_url);
+        order.api_order.overwrite(api_order)?;
         Ok(NewOrder { order })
     }
 
@@ -166,6 +167,6 @@ mod tests {
             .await
             .unwrap();
 
-        let _order = acc.new_order("acmetest.example.com", &[]).await.unwrap();
+        let _order = acc.new_order("acme-test.example.com", &[]).await.unwrap();
     }
 }

@@ -86,4 +86,28 @@ impl Order {
             .map(|identifier| identifier.value.as_str())
             .collect()
     }
+
+    // Let's Encrypt was observed to return domains in alternate order which
+    // may flip primary with SAN(s).
+    //
+    // This overwrites self without changing the order of the domains.
+    pub(crate) fn overwrite(&mut self, mut from_api: Self) -> eyre::Result<()> {
+        // Make sure the lists are the same.
+        if from_api.identifiers.len() != self.identifiers.len()
+            || from_api
+                .identifiers
+                .iter()
+                .any(|id| !self.identifiers.contains(id))
+        {
+            return Err(eyre::eyre!(
+                "Order domain(s) mismatch: had {:?} and got {:?}",
+                self.identifiers,
+                from_api.identifiers
+            ));
+        }
+        // Then preserve the original order.
+        from_api.identifiers = std::mem::take(&mut self.identifiers);
+        *self = from_api;
+        Ok(())
+    }
 }

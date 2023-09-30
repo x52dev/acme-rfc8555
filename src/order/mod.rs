@@ -30,7 +30,7 @@ pub use self::auth::{Auth, Challenge};
 /// The order wrapped with an outer facade.
 pub(crate) struct Order {
     acc: Arc<AccountInner>,
-    api_order: api::Order,
+    pub(crate) api_order: api::Order,
     url: String,
 }
 
@@ -140,7 +140,7 @@ impl NewOrder {
     /// The specification calls this a "POST-as-GET" against the order URL.
     pub async fn refresh(&mut self) -> eyre::Result<()> {
         let order = refresh_order(&self.order.acc, self.order.url.clone(), "ready").await?;
-        self.order = order;
+        self.order.api_order.overwrite(order.api_order)?;
         Ok(())
     }
 
@@ -201,7 +201,7 @@ impl CsrOrder {
     /// poll until the status changes to "valid"; `interval` is the amount of time to wait between
     /// each poll attempt.
     pub async fn finalize(
-        self,
+        mut self,
         private_key: p256::ecdsa::SigningKey,
         interval: Duration,
     ) -> eyre::Result<CertOrder> {
@@ -214,8 +214,8 @@ impl CsrOrder {
         let csr_b64 = BASE64_URL_SAFE_NO_PAD.encode(&csr_der);
         let finalize = api::Finalize::new(csr_b64);
 
-        let inner = self.order.acc;
-        let order_url = self.order.url;
+        let inner = &self.order.acc;
+        let order_url = &self.order.url;
         let finalize_url = &self.order.api_order.finalize;
 
         // If the CSR is invalid, we will get a 4xx code back that bombs out
@@ -225,7 +225,7 @@ impl CsrOrder {
         // wait for the status to not be processing:
         // valid -> cert is issued
         // invalid -> the whole thing is off
-        let order = poll_order_finalization(&inner, &order_url, interval).await?;
+        let order = poll_order_finalization(&inner, order_url, interval).await?;
 
         if !matches!(order.api_order.status, Some(api::OrderStatus::Valid)) {
             return Err(eyre::eyre!(
@@ -234,7 +234,12 @@ impl CsrOrder {
             ));
         }
 
-        Ok(CertOrder { private_key, order })
+        self.order.api_order.overwrite(order.api_order)?;
+
+        Ok(CertOrder {
+            private_key,
+            order: self.order,
+        })
     }
 
     /// Returns a reference to the order's API object.
