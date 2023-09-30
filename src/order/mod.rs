@@ -225,7 +225,7 @@ impl CsrOrder {
         // wait for the status to not be processing:
         // valid -> cert is issued
         // invalid -> the whole thing is off
-        let order = poll_order_finalization(&inner, order_url, interval).await?;
+        let order = poll_order_finalization(inner, order_url, interval).await?;
 
         if !matches!(order.api_order.status, Some(api::OrderStatus::Valid)) {
             return Err(eyre::eyre!(
