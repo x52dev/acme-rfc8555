@@ -78,9 +78,12 @@ impl Account {
         alt_names: &[&str],
     ) -> eyre::Result<NewOrder> {
         let mut identifiers = Vec::new();
-        let mut dedup = HashSet::new();
+        let mut domain_set = HashSet::new();
+
         for domain in iter::once(primary_name).chain(alt_names.iter().copied()) {
-            if dedup.insert(domain) {
+            // de-duplicate identifiers list
+            if domain_set.insert(domain) {
+                // domain set did not contain `domain`
                 identifiers.push(api::Identifier::dns(domain));
             }
         }
