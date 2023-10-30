@@ -95,7 +95,7 @@ fn post_new_order(url: &str) -> Response<Body> {
     "identifiers": [
         {
         "type": "dns",
-        "value": "acmetest.example.com"
+        "value": "acme-test.example.com"
         }
     ],
     "authorizations": [
@@ -122,7 +122,7 @@ fn post_get_order(url: &str) -> Response<Body> {
     "identifiers": [
         {
         "type": "dns",
-        "value": "acmetest.example.com"
+        "value": "acme-test.example.com"
         }
     ],
     "authorizations": [

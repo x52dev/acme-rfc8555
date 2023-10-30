@@ -77,14 +77,16 @@ impl Account {
         primary_name: &str,
         alt_names: &[&str],
     ) -> eyre::Result<NewOrder> {
-        let domains = iter::once(&primary_name)
-            .chain(alt_names)
-            .collect::<HashSet<_>>();
+        let mut identifiers = Vec::new();
+        let mut domain_set = HashSet::new();
 
-        let identifiers = domains
-            .into_iter()
-            .map(|&domain| api::Identifier::dns(domain))
-            .collect();
+        for domain in iter::once(primary_name).chain(alt_names.iter().copied()) {
+            // de-duplicate identifiers list
+            if domain_set.insert(domain) {
+                // domain set did not contain `domain`
+                identifiers.push(api::Identifier::dns(domain));
+            }
+        }
 
         let order = api::Order::from_identifiers(identifiers);
 
@@ -94,7 +96,8 @@ impl Account {
         let order_url = req_expect_header(&res, "location")?;
         let api_order = res.json::<api::Order>().await?;
 
-        let order = Order::new(&self.inner, api_order, order_url);
+        let mut order = Order::new(&self.inner, order, order_url);
+        order.api_order.overwrite(api_order)?;
         Ok(NewOrder { order })
     }
 
@@ -167,6 +170,6 @@ mod tests {
             .await
             .unwrap();
 
-        let _order = acc.new_order("acmetest.example.com", &[]).await.unwrap();
+        let _order = acc.new_order("acme-test.example.com", &[]).await.unwrap();
     }
 }
