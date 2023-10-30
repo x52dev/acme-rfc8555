@@ -8,7 +8,7 @@ use tokio::fs;
 const CHALLENGE_DIR: &str = "./acme-challenges";
 const CERTIFICATE_DIR: &str = "./acme-certificates";
 
-const DOMAINS: &[&str] = &["glados.x52.dev", "oc.x52.dev"];
+const DOMAINS: &[&str] = &["example.org"];
 const CONTACT_EMAIL: Option<&str> = None;
 
 #[actix_web::main]
