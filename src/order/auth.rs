@@ -210,7 +210,6 @@ impl Challenge<Dns> {
     }
 }
 
-/// See <https://datatracker.ietf.org/doc/html/rfc8737>.
 /// See [RFC 8737 §3].
 ///
 /// [RFC 8737 §3]: https://datatracker.ietf.org/doc/html/rfc8737#section-3
@@ -222,11 +221,7 @@ impl Challenge<TlsAlpn> {
         let acme_key = self.inner.transport.acme_key();
         let proof = key_authorization(&self.api_challenge.token, acme_key, false)?;
 
-        let proof_hash = Sha256::digest(proof)
-            .try_into()
-            .expect("SHA-256 should produce a 32-byte output");
-
-        Ok(proof_hash)
+        Ok(Sha256::digest(proof).into())
     }
 }
 
