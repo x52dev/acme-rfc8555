@@ -6,6 +6,7 @@
         "HMAC",
         "JWTs",
         "letsencrypt",
+        "MSRV",
         "oneshot",
         "pkix",
         "rcgen",
