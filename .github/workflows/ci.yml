@@ -16,27 +16,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  read_msrv:
+    name: Read MSRV
+    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@main
+
   test:
-    runs-on: ubuntu-latest
+    needs: read_msrv
+
     strategy:
       fail-fast: false
       matrix:
         toolchain:
-          - { name: msrv, version: "1.72" }
+          - { name: msrv, version: "${{ needs.read_msrv.outputs.msrv }}" }
           - { name: stable, version: stable }
 
+    runs-on: ubuntu-latest
+
     name: Test / ${{ matrix.toolchain.name }}
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+
       - name: Install Rust (${{ matrix.toolchain.name }})
         uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
         with:
           toolchain: ${{ matrix.toolchain.version }}
 
-      - name: Test (lib only)
-        if: matrix.toolchain.name == 'msrv'
-        run: cargo test --all-features --lib --tests
+      - name: Enter Nix devshell
+        uses: nicknovitski/nix-develop@v1.1.0
 
-      - name: Test (everything)
-        if: matrix.toolchain.name != 'msrv'
-        run: cargo test --all-features
+      - name: Test
+        run: just test-no-coverage

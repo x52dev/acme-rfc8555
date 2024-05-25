@@ -46,11 +46,11 @@ zeroize = "1"
 
 [dev-dependencies]
 actix-files = "0.6"
+actix-http = "3.5"
+actix-server = "2"
 actix-web = "4"
 color-eyre = "0.6"
 env_logger = "0.11"
-actix-http = "3.5"
-actix-server = "2"
 rcgen = "0.13"
 regex = "1.4"
 rustls = "0.23"
