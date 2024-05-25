@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.2
+
 - Update `reqwest` dependency to `0.12`.
 - Minimum supported Rust version (MSRV) is now 1.72.
 
