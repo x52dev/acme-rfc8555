@@ -2,7 +2,10 @@ use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 
 use acme::{create_p256_key, Directory, DirectoryUrl};
 use parking_lot::Mutex;
-use rustls::server::Acceptor;
+use rustls::{
+    pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer},
+    server::Acceptor,
+};
 use tokio::fs;
 
 const CERTIFICATE_DIR: &str = "./acme-certificates";
@@ -163,21 +166,22 @@ fn acme_tls_server(ids: AcmeIdentityMap) {
 
 /// Generate a self-signed server configuration for the ACME negotiator.
 fn acme_tls_server_config(server_name: &str, acme_identity: [u8; 32]) -> Arc<rustls::ServerConfig> {
-    let mut cert_params = rcgen::CertificateParams::new(vec![server_name.to_owned()]);
+    let mut cert_params = rcgen::CertificateParams::new(vec![server_name.to_owned()]).unwrap();
     cert_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
     cert_params.custom_extensions =
         vec![rcgen::CustomExtension::new_acme_identifier(&acme_identity)];
 
-    let cert = rcgen::Certificate::from_params(cert_params).unwrap();
-    let cert_der = cert.serialize_der().unwrap();
-    let key_der = cert.serialize_private_key_der();
+    let key_pair = rcgen::KeyPair::generate().unwrap();
+    let key_der = key_pair.serialize_der();
+
+    let cert = cert_params.self_signed(&key_pair).unwrap();
+    let cert_der = cert.der();
 
     let mut server_config = rustls::ServerConfig::builder()
-        .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(
-            vec![rustls::Certificate(cert_der.clone())],
-            rustls::PrivateKey(key_der.clone()),
+            vec![cert_der.clone()],
+            PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_der)),
         )
         .unwrap();
 

@@ -7,7 +7,8 @@ clippy:
     cargo hack --feature-powerset --depth=3 clippy --workspace
 
 test:
-    cargo test --all-features
+    cargo nextest run --all-features
+    cargo test --doc --all-features
     @just test-coverage-codecov
     @just test-coverage-lcov
     RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features
@@ -18,22 +19,22 @@ test-coverage-codecov:
 test-coverage-lcov:
     cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
 
-doc:
-    RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc --no-deps --workspace --all-features
+doc *args:
+    RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc --no-deps --workspace --all-features {{ args }}
 
-doc-watch:
-    RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc --no-deps --workspace --all-features --open
-    cargo watch -- RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc --no-deps --workspace --all-features
+doc-watch: (doc "--open")
+    cargo watch -- just doc
 
 check:
     just --unstable --fmt --check
-    npx -y prettier --check $(fd --hidden -e=md -e=yml)
-    taplo lint
+    fd --hidden --extension=md --extension=yml --exec-batch prettier --check
+    fd --hidden --extension=toml --exec-batch taplo format --check
+    fd --hidden --extension=toml --exec-batch taplo lint
     cargo +nightly fmt -- --check
 
 fmt:
     just --unstable --fmt
     nix fmt
-    npx -y prettier --write $(fd --hidden -e=md -e=yml)
-    taplo format
+    fd --hidden --extension=md --extension=yml --exec-batch prettier --write
+    fd --hidden --extension=toml --exec-batch taplo format
     cargo +nightly fmt

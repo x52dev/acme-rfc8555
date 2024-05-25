@@ -1,13 +1,11 @@
 #![allow(clippy::trivial_regex)]
 
-use std::{convert::Infallible, net::TcpListener, sync::OnceLock};
+use std::{convert::Infallible, future::ready, net::TcpListener, sync::OnceLock};
 
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server,
-};
+use actix_http::{HttpService, Method, Request, Response, StatusCode};
+use actix_server::{Server, ServerHandle};
+use actix_web::body::MessageBody;
 use regex::Regex;
-use tokio::sync::oneshot;
 
 static RE_URL: OnceLock<Regex> = OnceLock::new();
 
@@ -17,16 +15,16 @@ fn re_url() -> &'static Regex {
 
 pub struct TestServer {
     pub dir_url: String,
-    shutdown: Option<oneshot::Sender<()>>,
+    handle: ServerHandle,
 }
 
 impl Drop for TestServer {
     fn drop(&mut self) {
-        self.shutdown.take().unwrap().send(()).ok();
+        drop(self.handle.stop(false));
     }
 }
 
-fn get_directory(url: &str) -> Response<Body> {
+fn get_directory(url: &str) -> Response<impl MessageBody> {
     const BODY: &str = r#"{
     "keyChange": "<URL>/acme/key-change",
     "newAccount": "<URL>/acme/new-acct",
@@ -40,25 +38,24 @@ fn get_directory(url: &str) -> Response<Body> {
     }
     }"#;
 
-    Response::new(Body::from(
+    Response::with_body(
+        StatusCode::OK,
         RE_URL
             .get_or_init(|| Regex::new("<URL>").unwrap())
             .replace_all(BODY, url),
-    ))
+    )
 }
 
-fn head_new_nonce() -> Response<Body> {
-    Response::builder()
-        .status(204)
-        .header(
+fn head_new_nonce() -> Response<impl MessageBody> {
+    Response::build(StatusCode::NO_CONTENT)
+        .insert_header((
             "Replay-Nonce",
             "8_uBBV3N2DBRJczhoiB46ugJKUkUHxGzVe6xIMpjHFM",
-        )
-        .body(Body::empty())
-        .unwrap()
+        ))
+        .finish()
 }
 
-fn post_new_acct(url: &str) -> Response<Body> {
+fn post_new_acct(url: &str) -> Response<impl MessageBody> {
     const BODY: &str = r#"{
     "id": 7728515,
     "key": {
@@ -81,14 +78,12 @@ fn post_new_acct(url: &str) -> Response<Body> {
         .replace_all("<URL>/acme/acct/7728515", url)
         .into_owned();
 
-    Response::builder()
-        .status(201)
-        .header("Location", location)
-        .body(Body::from(BODY))
-        .unwrap()
+    Response::build(StatusCode::CREATED)
+        .insert_header(("Location", location))
+        .body(BODY)
 }
 
-fn post_new_order(url: &str) -> Response<Body> {
+fn post_new_order(url: &str) -> Response<impl MessageBody> {
     const BODY: &str = r#"{
     "status": "pending",
     "expires": "2019-01-09T08:26:43.570360537Z",
@@ -108,14 +103,12 @@ fn post_new_order(url: &str) -> Response<Body> {
         .replace_all("<URL>/acme/order/YTqpYUthlVfwBncUufE8", url)
         .into_owned();
 
-    Response::builder()
-        .status(201)
-        .header("Location", location)
-        .body(Body::from(re_url().replace_all(BODY, url)))
-        .unwrap()
+    Response::build(StatusCode::CREATED)
+        .insert_header(("Location", location))
+        .body(re_url().replace_all(BODY, url))
 }
 
-fn post_get_order(url: &str) -> Response<Body> {
+fn post_get_order(url: &str) -> Response<impl MessageBody> {
     const BODY: &str = r#"{
     "status": "<STATUS>",
     "expires": "2019-01-09T08:26:43.570360537Z",
@@ -134,13 +127,10 @@ fn post_get_order(url: &str) -> Response<Body> {
 
     let body = re_url().replace_all(BODY, url).into_owned();
 
-    Response::builder()
-        .status(200)
-        .body(Body::from(body))
-        .unwrap()
+    Response::build(StatusCode::OK).body(body)
 }
 
-fn post_authz(url: &str) -> Response<Body> {
+fn post_authz(url: &str) -> Response<impl MessageBody> {
     const BODY: &str = r#"{
         "identifier": {
             "type": "dns",
@@ -170,70 +160,70 @@ fn post_authz(url: &str) -> Response<Body> {
         ]
     }"#;
 
-    Response::builder()
-        .status(201)
-        .body(Body::from(re_url().replace_all(BODY, url)))
-        .unwrap()
+    Response::build(StatusCode::CREATED).body(re_url().replace_all(BODY, url))
 }
 
-fn post_finalize(_url: &str) -> Response<Body> {
-    Response::builder().status(200).body(Body::empty()).unwrap()
+fn post_finalize(_url: &str) -> Response<impl MessageBody> {
+    Response::ok()
 }
 
-fn post_certificate(_url: &str) -> Response<Body> {
-    Response::builder()
-        .status(200)
-        .body("CERT HERE".into())
-        .unwrap()
+fn post_certificate(_url: &str) -> Response<impl MessageBody> {
+    Response::build(StatusCode::OK).body("CERT HERE")
 }
 
-fn route_request(req: Request<Body>, url: &str) -> Response<Body> {
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/directory") => get_directory(url),
-        (&Method::HEAD, "/acme/new-nonce") => head_new_nonce(),
-        (&Method::POST, "/acme/new-acct") => post_new_acct(url),
-        (&Method::POST, "/acme/new-order") => post_new_order(url),
-        (&Method::POST, "/acme/order/YTqpYUthlVfwBncUufE8") => post_get_order(url),
-        (&Method::POST, "/acme/authz/YTqpYUthlVfwBncUufE8IRWLMSRqcSs") => post_authz(url),
-        (&Method::POST, "/acme/finalize/7738992/18234324") => post_finalize(url),
-        (&Method::POST, "/acme/cert/fae41c070f967713109028") => post_certificate(url),
-        (_, _) => Response::builder().status(404).body(Body::empty()).unwrap(),
+fn route_request(req: Request, url: &str) -> Response<impl MessageBody> {
+    match (req.method(), req.path()) {
+        (&Method::GET, "/directory") => get_directory(url).map_into_boxed_body(),
+        (&Method::HEAD, "/acme/new-nonce") => head_new_nonce().map_into_boxed_body(),
+        (&Method::POST, "/acme/new-acct") => post_new_acct(url).map_into_boxed_body(),
+        (&Method::POST, "/acme/new-order") => post_new_order(url).map_into_boxed_body(),
+
+        (&Method::POST, "/acme/order/YTqpYUthlVfwBncUufE8") => {
+            post_get_order(url).map_into_boxed_body()
+        }
+
+        (&Method::POST, "/acme/authz/YTqpYUthlVfwBncUufE8IRWLMSRqcSs") => {
+            post_authz(url).map_into_boxed_body()
+        }
+
+        (&Method::POST, "/acme/finalize/7738992/18234324") => {
+            post_finalize(url).map_into_boxed_body()
+        }
+
+        (&Method::POST, "/acme/cert/fae41c070f967713109028") => {
+            post_certificate(url).map_into_boxed_body()
+        }
+
+        (_, _) => Response::build(StatusCode::NOT_FOUND)
+            .finish()
+            .map_into_boxed_body(),
     }
 }
 
 pub fn with_directory_server() -> TestServer {
-    let tcp = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = tcp.local_addr().unwrap().port();
+    let lst = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = lst.local_addr().unwrap().port();
 
     let url = format!("http://127.0.0.1:{port}");
     let dir_url = format!("{url}/directory");
 
-    let (tx, rx) = oneshot::channel::<()>();
-
-    let make_service = make_service_fn(move |_| {
-        let url = url.clone();
-        async move {
+    let server = Server::build()
+        .listen("acme", lst, move || {
             let url = url.clone();
-            hyper::Result::Ok(service_fn(move |req| {
-                let url = url.clone();
-                async move { Ok::<_, Infallible>(route_request(req, &url)) }
-            }))
-        }
-    });
 
-    let server = Server::from_tcp(tcp)
+            HttpService::build()
+                .finish(move |req| ready(Ok::<_, Infallible>(route_request(req, &url))))
+                .tcp()
+        })
         .unwrap()
-        .serve(make_service)
-        .with_graceful_shutdown(async {
-            rx.await.ok();
-        });
+        .workers(1)
+        .run();
+
+    let handle = server.handle();
 
     tokio::spawn(server);
 
-    TestServer {
-        dir_url,
-        shutdown: Some(tx),
-    }
+    TestServer { dir_url, handle }
 }
 
 #[tokio::test]
