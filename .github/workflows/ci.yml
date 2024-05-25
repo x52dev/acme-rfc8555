@@ -45,6 +45,11 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain.version }}
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2.33.26
+        with:
+          tool: cargo-nextest
+
       - name: Enter Nix devshell
         uses: nicknovitski/nix-develop@v1.1.0
 
