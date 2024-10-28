@@ -51,7 +51,7 @@ jobs:
           tool: cargo-nextest
 
       - name: Enter Nix devshell
-        uses: nicknovitski/nix-develop@v1.1.0
+        uses: nicknovitski/nix-develop@v1.1.1
 
       - name: Test
         run: just test-no-coverage
