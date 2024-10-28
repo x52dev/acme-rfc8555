@@ -30,7 +30,7 @@ jobs:
         uses: nicknovitski/nix-develop@v1.1.1
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2.44.44
+        uses: taiki-e/install-action@v2.44.53
         with:
           tool: cargo-llvm-cov
 
