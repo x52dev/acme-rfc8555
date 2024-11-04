@@ -27,7 +27,7 @@ jobs:
           components: llvm-tools-preview
 
       - name: Enter Nix devshell
-        uses: nicknovitski/nix-develop@v1.1.1
+        uses: nicknovitski/nix-develop@v1.2.0
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2.44.53
