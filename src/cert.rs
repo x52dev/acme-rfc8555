@@ -1,9 +1,11 @@
+use std::io::{BufReader, Cursor};
+
 use der::{
     asn1::Ia5String,
     time::{OffsetDateTime, PrimitiveDateTime},
-    DecodePem as _, Encode,
+    Decode as _, DecodePem as _,
 };
-use eyre::WrapErr as _;
+use eyre::{eyre, WrapErr as _};
 use pkcs8::{DecodePrivateKey, EncodePrivateKey};
 use x509_cert::{
     builder::{Builder, RequestBuilder as CsrBuilder},
@@ -86,15 +88,19 @@ impl Certificate {
         Ok(der.as_bytes().to_vec())
     }
 
-    /// The issued certificate in PEM format.
+    /// The issued certificate file in PEM format.
     pub fn certificate(&self) -> &str {
         &self.certificate
     }
 
-    /// The issued certificate in DER encoding.
-    pub fn certificate_der(&self) -> eyre::Result<Vec<u8>> {
-        let x509 = x509_cert::Certificate::from_pem(&self.certificate)?;
-        x509.to_der().context("der")
+    /// The issued certificate chain in DER format.
+    pub fn certificate_chain(&self) -> eyre::Result<Vec<Vec<u8>>> {
+        let mut rdr = BufReader::new(Cursor::new(self.certificate()));
+
+        rustls_pemfile::certs(&mut rdr)
+            .map(|res| res.map(|cert| cert.to_vec()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     /// Inspect the certificate to count the number of (whole) valid days left.
@@ -110,7 +116,12 @@ impl Certificate {
             return Ok(89);
         }
 
-        let cert = x509_cert::Certificate::from_pem(&self.certificate)?;
+        let cert_chain = self.certificate_chain()?;
+        let cert_ee = cert_chain
+            .first() // EE cert is first
+            .ok_or_else(|| eyre!("no certificates in chain"))?;
+
+        let cert = x509_cert::Certificate::from_der(cert_ee)?;
 
         let not_after = cert.tbs_certificate.validity.not_after.to_date_time();
         // TODO: justify assume_utc

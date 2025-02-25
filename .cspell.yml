@@ -9,6 +9,7 @@ words:
   - letsencrypt
   - MSRV
   - oneshot
+  - pemfile
   - pkix
   - rcgen
   - reqwest

@@ -128,8 +128,8 @@ async fn main() -> eyre::Result<()> {
     fs::write(key_path, cert.private_key()).await?;
 
     println!();
-    println!("cert valid for {} days", cert.valid_days_left()?);
     println!("{}", cert.certificate());
+    println!("cert valid for {} days", cert.valid_days_left()?);
 
     Ok(())
 }
@@ -220,7 +220,7 @@ fn acme_tls_server_config(
         .wrap_err("Failed to load private key")?;
 
     let certified_key = CertifiedKey::new(vec![cert.der().clone()], private_key);
-    verify_keys_match(&certified_key)?;
+    verify_keys_match(&certified_key).wrap_err("Keys do not match")?;
 
     let mut server_config =
         server_config.with_cert_resolver(Arc::new(SingleCertAndKey::from(certified_key)));
@@ -240,22 +240,24 @@ fn acme_tls_server_config(
 fn verify_keys_match(certified_key: &CertifiedKey) -> eyre::Result<()> {
     let matched = certified_key.keys_match();
 
-    let err = match matched {
+    let cert_err = match matched {
         // don't treat unknown consistency as an error
         Ok(()) | Err(rustls::Error::InconsistentKeys(rustls::InconsistentKeys::Unknown)) => {
             return Ok(())
         }
-        Err(err) => err,
+        Err(rustls::Error::InvalidCertificate(err)) => err,
+        Err(err) => return Err(err.into()),
     };
 
-    if let rustls::Error::Other(ref other_err) = err {
-        if let Some(webpki_err) = other_err.0.downcast_ref::<webpki::Error>() {
-            if webpki_err == &webpki::Error::UnsupportedCriticalExtension {
-                // unsupported critical extension is expected for this cert
-                return Ok(());
-            }
+    if let rustls::CertificateError::Other(other_err) = &cert_err {
+        if let Some(webpki::Error::UnsupportedCriticalExtension) =
+            other_err.0.downcast_ref::<webpki::Error>()
+        {
+            // unsupported critical extension is expected for this cert
+            return Ok(());
         }
     }
 
-    Err(err.into())
+    // any other reason should be propagated
+    Err(rustls::Error::InvalidCertificate(cert_err).into())
 }

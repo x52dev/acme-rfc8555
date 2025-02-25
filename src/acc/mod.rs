@@ -1,6 +1,7 @@
 use std::{collections::HashSet, iter, sync::Arc};
 
 use base64::prelude::*;
+use eyre::eyre;
 use zeroize::Zeroizing;
 
 use crate::{
@@ -107,8 +108,13 @@ impl Account {
         cert: &Certificate,
         reason: RevocationReason,
     ) -> eyre::Result<()> {
+        let cert_chain = cert.certificate_chain()?;
+        let cert_ee = cert_chain
+            .first()
+            .ok_or_else(|| eyre!("no certificates in chain"))?;
+
         // convert to base64url of the DER (which is not PEM).
-        let certificate = BASE64_URL_SAFE_NO_PAD.encode(cert.certificate_der()?);
+        let certificate = BASE64_URL_SAFE_NO_PAD.encode(cert_ee);
 
         let reason = match reason {
             // > the reason code CRL entry extension SHOULD be absent instead of

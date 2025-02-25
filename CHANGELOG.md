@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correctly handle certificate chains in `Certificate::valid_days_left()`.
+
 ## 0.1.2
 
 - Update `reqwest` dependency to `0.12`.
