@@ -5,12 +5,12 @@
 <!-- prettier-ignore-start -->
 
 [![crates.io](https://img.shields.io/crates/v/acme-rfc8555?label=latest)](https://crates.io/crates/acme-rfc8555)
-[![Documentation](https://docs.rs/acme-rfc8555/badge.svg)](https://docs.rs/acme-rfc8555/0.1.2)
+[![Documentation](https://docs.rs/acme-rfc8555/badge.svg)](https://docs.rs/acme-rfc8555/0.2.0)
 ![MIT or Apache 2.0 licensed](https://img.shields.io/crates/l/acme-rfc8555.svg)
 <br />
 [![CI](https://github.com/x52dev/acme-rfc8555/actions/workflows/ci.yml/badge.svg)](https://github.com/x52dev/acme-rfc8555/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/x52dev/acme-rfc8555/branch/main/graph/badge.svg)](https://codecov.io/gh/x52dev/acme-rfc8555)
-[![dependency status](https://deps.rs/crate/acme-rfc8555/0.1.2/status.svg)](https://deps.rs/crate/acme-rfc8555/0.1.2)
+[![dependency status](https://deps.rs/crate/acme-rfc8555/0.2.0/status.svg)](https://deps.rs/crate/acme-rfc8555/0.2.0)
 [![Download](https://img.shields.io/crates/d/acme-rfc8555.svg)](https://crates.io/crates/acme-rfc8555)
 
 <!-- prettier-ignore-end -->

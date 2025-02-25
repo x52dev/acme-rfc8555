@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0
+
 - Correctly handle certificate chains in `Certificate::valid_days_left()`.
 
 ## 0.1.2
