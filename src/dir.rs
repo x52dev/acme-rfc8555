@@ -29,7 +29,7 @@ pub enum DirectoryUrl<'a> {
     Other(&'a str),
 }
 
-impl<'a> DirectoryUrl<'a> {
+impl DirectoryUrl<'_> {
     fn to_url(&self) -> &str {
         match self {
             DirectoryUrl::LetsEncrypt => LETSENCRYPT_URL,

@@ -8,12 +8,12 @@ use crate::acc::AcmeKey;
 /// JWT Protected Header scheme as defined in [RFC 8555 §6.2].
 ///
 /// > For newAccount requests, and for revokeCert requests authenticated by a certificate key,
-/// there MUST be a "jwk" field. This field MUST contain the public key corresponding to the
-/// private key used to sign the JWS.
+/// > there MUST be a "jwk" field. This field MUST contain the public key corresponding to the
+/// > private key used to sign the JWS.
 /// >
 /// > For all other requests, the request is signed using an existing account, and there MUST be a
-/// "kid" field. This field MUST contain the account URL received by POSTing to the newAccount
-/// resource.
+/// > "kid" field. This field MUST contain the account URL received by POSTing to the newAccount
+/// > resource.
 ///
 /// [RFC 8555 §6.2]: https://datatracker.ietf.org/doc/html/rfc8555#section-6.2
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -24,8 +24,8 @@ pub(crate) struct JwsProtectedHeader {
     /// one in which the algorithm registry description mentions MAC/HMAC).
     ///
     /// > An ACME server MUST implement the "ES256" signature algorithm (RFC 7518) and SHOULD
-    /// implement the "EdDSA" signature algorithm using the "Ed25519" variant (indicated by "crv")
-    /// (RFC 8037).
+    /// > implement the "EdDSA" signature algorithm using the "Ed25519" variant (indicated by "crv")
+    /// > (RFC 8037).
     alg: String,
 
     /// A unique value that enables the verifier of a JWS to recognize when replay has occurred.
@@ -33,8 +33,8 @@ pub(crate) struct JwsProtectedHeader {
     /// As defined in [RFC 8555 §6.5].
     ///
     /// > The value of the "nonce" header parameter MUST be an octet string, encoded according to
-    /// the base64url encoding. If the value of a "nonce" header parameter is not valid according to
-    /// this encoding, then the verifier MUST reject the JWS as malformed
+    /// > the base64url encoding. If the value of a "nonce" header parameter is not valid according
+    /// > to this encoding, then the verifier MUST reject the JWS as malformed
     ///
     /// [RFC 8555 §6.5: https://datatracker.ietf.org/doc/html/rfc8555#section-6.5.
     nonce: String,
@@ -42,8 +42,8 @@ pub(crate) struct JwsProtectedHeader {
     /// Defined in [RFC 8555 §6.4].
     ///
     /// > The "url" header parameter specifies the URL (RFC 3986) to which this JWS object is
-    /// directed. The "url" header parameter MUST be carried in the protected header of the JWS. The
-    /// value of the "url" header parameter MUST be a string representing the target URL.
+    /// > directed. The "url" header parameter MUST be carried in the protected header of the JWS.
+    /// > The value of the "url" header parameter MUST be a string representing the target URL.
     ///
     /// [RFC 8555 §6.4]: https://datatracker.ietf.org/doc/html/rfc8555#section-6.4
     url: String,
@@ -62,7 +62,7 @@ pub(crate) struct JwsProtectedHeader {
 }
 
 impl JwsProtectedHeader {
-    /// TODO: implement EdDSA (via Ed25519)
+    // TODO: implement EdDSA (via Ed25519)
 
     pub(crate) fn new_jwk(jwk: Jwk, url: &str, nonce: String) -> Self {
         JwsProtectedHeader {
