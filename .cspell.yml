@@ -1,0 +1,20 @@
+version: "0.2"
+words:
+  - actix
+  - alpn
+  - Deque
+  - docsrs
+  - HMAC
+  - JWTs
+  - letsencrypt
+  - MSRV
+  - oneshot
+  - pkix
+  - rcgen
+  - reqwest
+  - rustdoc
+  - rustls
+  - serde
+  - subproblems
+  - ureq
+  - webpki
