@@ -265,7 +265,7 @@ impl<A> Challenge<A> {
                 .next();
 
             let reason = match error {
-                Some(error) => error.detail.clone().unwrap_or_else(|| error._type.clone()),
+                Some(error) => format!("{error} (subproblems: {:?})", error.subproblems),
                 None => "Validation failed and no error found".to_owned(),
             };
 

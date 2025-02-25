@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 
 use acme::{create_p256_key, Directory, DirectoryUrl};
+use eyre::eyre;
 use parking_lot::Mutex;
 use rustls::{
     pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer},
@@ -20,6 +21,10 @@ type AcmeIdentityMap = Arc<Mutex<HashMap<String, [u8; 32]>>>;
 async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .map_err(|_| eyre!("could not install rustls crypto provider"))?;
 
     log::info!("ensuring certificate dir exists");
     fs::create_dir_all(CERTIFICATE_DIR)
@@ -116,6 +121,7 @@ async fn main() -> eyre::Result<()> {
     fs::write(key_path, cert.private_key()).await?;
 
     println!();
+    println!("cert valid for {} days", cert.valid_days_left()?);
     println!("{}", cert.certificate());
 
     Ok(())
@@ -123,7 +129,7 @@ async fn main() -> eyre::Result<()> {
 
 /// Starts a (synchronous) TCP/TLS listener on port 443 that responds to connections from an ACME
 /// provider with self-signed certificates containing proof of domain ownership for items in `ids`.
-fn acme_tls_server(ids: AcmeIdentityMap) {
+fn acme_tls_server(ids: AcmeIdentityMap) -> eyre::Result<()> {
     // Start a TLS server accepting connections as they arrive.
     let listener = std::net::TcpListener::bind(("0.0.0.0", 443)).unwrap();
 
@@ -155,26 +161,31 @@ fn acme_tls_server(ids: AcmeIdentityMap) {
 
         // Generate a server config for the accepted connection based on the
         // server name indicated.
-        let config = acme_tls_server_config(server_name, acme_identity);
-        let mut conn = accepted.into_connection(config).unwrap();
+        let config = acme_tls_server_config(server_name, acme_identity)?;
+        let mut conn = accepted.into_connection(config).map_err(|(err, _)| err)?;
 
         // Proceed with handling the connection until the ACME client closes
         // the connection.
         _ = conn.complete_io(&mut stream);
     }
+
+    Ok(())
 }
 
 /// Generate a self-signed server configuration for the ACME negotiator.
-fn acme_tls_server_config(server_name: &str, acme_identity: [u8; 32]) -> Arc<rustls::ServerConfig> {
-    let mut cert_params = rcgen::CertificateParams::new(vec![server_name.to_owned()]).unwrap();
+fn acme_tls_server_config(
+    server_name: &str,
+    acme_identity: [u8; 32],
+) -> eyre::Result<Arc<rustls::ServerConfig>> {
+    let mut cert_params = rcgen::CertificateParams::new(vec![server_name.to_owned()])?;
     cert_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
     cert_params.custom_extensions =
         vec![rcgen::CustomExtension::new_acme_identifier(&acme_identity)];
 
-    let key_pair = rcgen::KeyPair::generate().unwrap();
+    let key_pair = rcgen::KeyPair::generate()?;
     let key_der = key_pair.serialize_der();
 
-    let cert = cert_params.self_signed(&key_pair).unwrap();
+    let cert = cert_params.self_signed(&key_pair)?;
     let cert_der = cert.der();
 
     let mut server_config = rustls::ServerConfig::builder()
@@ -182,8 +193,7 @@ fn acme_tls_server_config(server_name: &str, acme_identity: [u8; 32]) -> Arc<rus
         .with_single_cert(
             vec![cert_der.clone()],
             PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_der)),
-        )
-        .unwrap();
+        )?;
 
     // defined in https://datatracker.ietf.org/doc/html/rfc8737#section-4
     const ACME_ALPN: &[u8] = b"acme-tls/1";
@@ -191,5 +201,5 @@ fn acme_tls_server_config(server_name: &str, acme_identity: [u8; 32]) -> Arc<rus
     server_config.alpn_protocols = vec![ACME_ALPN.to_vec()];
     server_config.key_log = Arc::new(rustls::KeyLogFile::new());
 
-    Arc::new(server_config)
+    Ok(Arc::new(server_config))
 }

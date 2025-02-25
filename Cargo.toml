@@ -51,7 +51,7 @@ actix-server = "2"
 actix-web = "4"
 color-eyre = "0.6"
 env_logger = "0.11"
-rcgen = "0.13"
+rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
 regex = "1.4"
 rustls = "0.23"
 tokio = { version = "1.24.2", features = ["full"] }
