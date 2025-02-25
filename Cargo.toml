@@ -14,15 +14,15 @@ license = "MIT"
 edition = "2021"
 rust-version = "1.72"
 
-[features]
-default = ["reqwest/rustls-tls-webpki-roots"]
-
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 name = "acme"
+
+[features]
+default = ["reqwest/rustls-tls-webpki-roots"]
 
 [dependencies]
 base64 = "0.22"
@@ -51,7 +51,9 @@ actix-server = "2"
 actix-web = "4"
 color-eyre = "0.6"
 env_logger = "0.11"
+error_reporter = "1"
 rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
 regex = "1.4"
 rustls = "0.23"
+rustls-webpki = "0.102"
 tokio = { version = "1.24.2", features = ["full"] }

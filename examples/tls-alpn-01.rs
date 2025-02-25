@@ -1,11 +1,12 @@
 use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 
 use acme::{create_p256_key, Directory, DirectoryUrl};
-use eyre::eyre;
+use eyre::{eyre, WrapErr as _};
 use parking_lot::Mutex;
 use rustls::{
     pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer},
     server::Acceptor,
+    sign::{CertifiedKey, SingleCertAndKey},
 };
 use tokio::fs;
 
@@ -22,7 +23,7 @@ async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    rustls::crypto::ring::default_provider()
+    rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .map_err(|_| eyre!("could not install rustls crypto provider"))?;
 
@@ -37,7 +38,13 @@ async fn main() -> eyre::Result<()> {
 
     let _srv_handle = thread::spawn({
         let identity_map = Arc::clone(&identity_map);
-        move || acme_tls_server(identity_map)
+        move || {
+            if let Err(err) = acme_tls_server(identity_map) {
+                let err =
+                    error_reporter::Report::new(<_ as AsRef<dyn std::error::Error>>::as_ref(&err));
+                log::error!("{err}");
+            }
+        }
     });
 
     log::info!("fetching LetsEncrypt directory");
@@ -153,20 +160,29 @@ fn acme_tls_server(ids: AcmeIdentityMap) -> eyre::Result<()> {
             continue;
         };
 
+        log::info!("received TLS connection for {server_name}");
+
         let Some(&acme_identity) = ids.lock().get(server_name) else {
             // If the server name indicated doesn't have an associated identity,
             // then the connection is not for us; drop it.
             continue;
         };
 
+        log::info!("constructing TLS ALPN response");
+
         // Generate a server config for the accepted connection based on the
         // server name indicated.
-        let config = acme_tls_server_config(server_name, acme_identity)?;
-        let mut conn = accepted.into_connection(config).map_err(|(err, _)| err)?;
+        let config = acme_tls_server_config(server_name, acme_identity)
+            .wrap_err("Failed to construct server config")?;
+        let mut conn = accepted
+            .into_connection(config)
+            .map_err(|(err, _)| err)
+            .wrap_err("Failed to accept connection")?;
 
         // Proceed with handling the connection until the ACME client closes
         // the connection.
-        _ = conn.complete_io(&mut stream);
+        conn.complete_io(&mut stream)
+            .wrap_err("Failed to complete I/O")?;
     }
 
     Ok(())
@@ -177,23 +193,37 @@ fn acme_tls_server_config(
     server_name: &str,
     acme_identity: [u8; 32],
 ) -> eyre::Result<Arc<rustls::ServerConfig>> {
-    let mut cert_params = rcgen::CertificateParams::new(vec![server_name.to_owned()])?;
+    let mut cert_params = rcgen::CertificateParams::new(vec![server_name.to_owned()])
+        .wrap_err("Failed to construct cert params")?;
     cert_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
     cert_params.custom_extensions =
         vec![rcgen::CustomExtension::new_acme_identifier(&acme_identity)];
 
-    let key_pair = rcgen::KeyPair::generate()?;
+    let key_pair = rcgen::KeyPair::generate().wrap_err("Failed to generate keypair")?;
     let key_der = key_pair.serialize_der();
 
-    let cert = cert_params.self_signed(&key_pair)?;
-    let cert_der = cert.der();
+    let cert = cert_params
+        .self_signed(&key_pair)
+        .wrap_err("Failed to generate cert")?;
 
-    let mut server_config = rustls::ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(
-            vec![cert_der.clone()],
-            PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_der)),
-        )?;
+    // save rcgen cert for inspection
+    std::fs::write("acme-certificates/tls-alpn-cert.pem", cert.pem())?;
+
+    let server_config = rustls::ServerConfig::builder().with_no_client_auth();
+
+    // construct certified key manually since rustls webpki doesn't understand
+    // the critical ACME identifier extension required for the certificate
+    let private_key = server_config
+        .crypto_provider()
+        .key_provider
+        .load_private_key(PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_der)))
+        .wrap_err("Failed to load private key")?;
+
+    let certified_key = CertifiedKey::new(vec![cert.der().clone()], private_key);
+    verify_keys_match(&certified_key)?;
+
+    let mut server_config =
+        server_config.with_cert_resolver(Arc::new(SingleCertAndKey::from(certified_key)));
 
     // defined in https://datatracker.ietf.org/doc/html/rfc8737#section-4
     const ACME_ALPN: &[u8] = b"acme-tls/1";
@@ -202,4 +232,30 @@ fn acme_tls_server_config(
     server_config.key_log = Arc::new(rustls::KeyLogFile::new());
 
     Ok(Arc::new(server_config))
+}
+
+/// This step isn't strictly necessary but re-implements the type of validation done by
+/// `CertifiedKey::from_der`, a function which we can't call because it validates critical
+/// extensions.
+fn verify_keys_match(certified_key: &CertifiedKey) -> eyre::Result<()> {
+    let matched = certified_key.keys_match();
+
+    let err = match matched {
+        // don't treat unknown consistency as an error
+        Ok(()) | Err(rustls::Error::InconsistentKeys(rustls::InconsistentKeys::Unknown)) => {
+            return Ok(())
+        }
+        Err(err) => err,
+    };
+
+    if let rustls::Error::Other(ref other_err) = err {
+        if let Some(webpki_err) = other_err.0.downcast_ref::<webpki::Error>() {
+            if webpki_err == &webpki::Error::UnsupportedCriticalExtension {
+                // unsupported critical extension is expected for this cert
+                return Ok(());
+            }
+        }
+    }
+
+    Err(err.into())
 }
