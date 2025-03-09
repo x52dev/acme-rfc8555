@@ -3,6 +3,12 @@ import '.toolchain/rust.just'
 _list:
     @just --list
 
+# Downgrade dev-dependencies necessary to run MSRV checks/tests.
+[private]
+downgrade-for-msrv:
+    cargo update -p=litemap --precise=0.7.4 # next ver: 1.81.0
+    cargo update -p=zerofrom --precise=0.1.5 # next ver: 1.81.0
+
 # Check project
 check:
     just --unstable --fmt --check
