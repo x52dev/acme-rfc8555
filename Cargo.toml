@@ -56,5 +56,5 @@ error_reporter = "1"
 rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
 regex = "1.4"
 rustls = "0.23"
-rustls-webpki = "0.102"
+rustls-webpki = "0.103"
 tokio = { version = "1.24.2", features = ["full"] }

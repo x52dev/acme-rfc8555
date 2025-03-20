@@ -251,6 +251,7 @@ fn verify_keys_match(certified_key: &CertifiedKey) -> eyre::Result<()> {
 
     if let rustls::CertificateError::Other(other_err) = &cert_err {
         if let Some(webpki::Error::UnsupportedCriticalExtension) =
+            // unfortunate dependency on exact webpki version
             other_err.0.downcast_ref::<webpki::Error>()
         {
             // unsupported critical extension is expected for this cert
