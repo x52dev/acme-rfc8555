@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Minimum supported Rust version (MSRV) is now 1.75.
+
 ## 0.2.0
 
 - Correctly handle certificate chains in `Certificate::valid_days_left()`.

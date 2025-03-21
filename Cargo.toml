@@ -12,7 +12,7 @@ keywords = ["acme", "certificate", "tls", "letsencrypt", "lets-encrypt"]
 repository = "https://github.com/x52dev/acme-rfc8555"
 license = "MIT"
 edition = "2021"
-rust-version = "1.72"
+rust-version = "1.75"
 
 [package.metadata.docs.rs]
 all-features = true
