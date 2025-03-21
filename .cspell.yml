@@ -2,12 +2,14 @@ version: "0.2"
 words:
   - actix
   - alpn
+  - clippy
   - Deque
   - docsrs
   - HMAC
   - JWTs
   - letsencrypt
   - MSRV
+  - nextest
   - oneshot
   - pemfile
   - pkix
