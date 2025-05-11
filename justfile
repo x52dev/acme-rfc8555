@@ -8,6 +8,7 @@ _list:
 # Downgrade dependencies necessary to run MSRV checks/tests.
 [private]
 downgrade-for-msrv:
+    cargo {{ toolchain }} update -p=backtrace --precise=0.3.74 # next ver: 1.82.0
     cargo {{ toolchain }} update -p=idna_adapter --precise=1.2.0 # next ver: 1.82.0
     cargo {{ toolchain }} update -p=litemap --precise=0.7.4 # next ver: 1.81.0
     cargo {{ toolchain }} update -p=zerofrom --precise=0.1.5 # next ver: 1.81.0
@@ -49,7 +50,8 @@ test: test-no-coverage
     @just test-coverage-lcov
 
 # Test workspace using MSRV
-test-msrv: downgrade-for-msrv
+test-msrv:
+    @just toolchain={{ msrv_rustup }} downgrade-for-msrv
     @just toolchain={{ msrv_rustup }} test-no-coverage
 
 # Test workspace and generate Codecov coverage file
