@@ -15,6 +15,7 @@ keys = [
     "target.*.*-dependencies",
 ]
 formatting.reorder_keys = true
+formatting.align_comments = false
 
 [[rule]]
 include = ["**/Cargo.toml"]
@@ -27,3 +28,4 @@ keys = [
     "target.*.*-dependencies",
 ]
 formatting.reorder_keys = false
+formatting.align_comments = false

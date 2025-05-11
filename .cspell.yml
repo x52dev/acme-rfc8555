@@ -10,14 +10,19 @@ words:
   - letsencrypt
   - MSRV
   - nextest
+  - nixos
+  - nixpkgs
   - oneshot
   - pemfile
+  - pkgs
   - pkix
   - rcgen
   - reqwest
   - rustdoc
   - rustls
   - serde
+  - stdenv
   - subproblems
+  - taplo
   - ureq
   - webpki

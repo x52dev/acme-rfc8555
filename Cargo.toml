@@ -18,6 +18,11 @@ rust-version = "1.75"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
+[package.metadata.cargo_check_external_types]
+allowed_external_types = [
+  "std::*", # 
+]
+
 [lib]
 name = "acme"
 
@@ -34,7 +39,7 @@ p256 = { version = "0.13", features = ["pkcs8", "ecdsa-core"] }
 parking_lot = "0.12"
 pem = { package = "pem-rfc7468", version = "0.7" }
 pkcs8 = "0.10"
-rand = "0.8"
+rand = "0.8" # 0.9 waiting for p256 0.14
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
 rustls-pemfile = "2"
 serde = { version = "1", features = ["derive"] }
@@ -57,4 +62,4 @@ rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "
 regex = "1.4"
 rustls = "0.23"
 rustls-webpki = "0.103"
-tokio = { version = "1.24.2", features = ["full"] }
+tokio = { version = "1.38.2", features = ["full"] }
