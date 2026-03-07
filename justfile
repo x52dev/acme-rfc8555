@@ -14,6 +14,8 @@ downgrade-for-msrv:
     cargo {{ toolchain }} update -p=zerofrom --precise=0.1.5 # next ver: 1.81.0
     cargo {{ toolchain }} update -p=base64ct --precise=1.6.0 # next ver: 1.81.0
     cargo {{ toolchain }} update -p=time --precise=0.3.41 # next ver: 1.81.0
+    cargo {{ toolchain }} update -p=actix-web --precise=4.12.0 # next ver: 1.88.0
+    cargo {{ toolchain }} update -p=actix-http --precise=3.11.2 # next ver: 1.88.0
 
 # Check project
 check:
