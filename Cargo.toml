@@ -17,6 +17,11 @@ rust-version = "1.85"
 [package.metadata.docs.rs]
 all-features = true
 
+[package.metadata.cargo-shear]
+ignored = [
+    "time" # specified for features
+]
+
 [package.metadata.cargo_check_external_types]
 allowed_external_types = [
   "std::*", #
@@ -45,6 +50,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = { version = "0.10.6", features = ["oid"] }
 tokio = { version = "1.24.2", features = ["time"] }
+time = { version = "0.3", default-features = false, features = ["std"] }
 x509-cert = { version = "0.2.4", features = ["pem", "builder"] }
 zeroize = "1"
 
