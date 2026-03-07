@@ -101,9 +101,7 @@ impl Certificate {
         // Use (SectionKind, Vec<u8>) to extract all PEM sections, then filter for certificates
         let certs = rustls_pki_types::pem::ReadIter::new(&mut rdr)
             .filter_map(|res| match res {
-                Ok((kind, der)) if kind == SectionKind::Certificate => {
-                    Some(CertificateDer::from(der))
-                }
+                Ok((SectionKind::Certificate, der)) => Some(CertificateDer::from(der)),
                 _ => None,
             })
             .collect::<Vec<_>>();
