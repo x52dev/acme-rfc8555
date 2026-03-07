@@ -8,6 +8,7 @@ _list:
 # Downgrade dependencies necessary to run MSRV checks/tests.
 [private]
 downgrade-for-msrv:
+    cargo {{ toolchain }} update -p=time --precise=0.3.45 # next ver: 1.88.0
     cargo {{ toolchain }} update -p=actix-web --precise=4.12.0 # next ver: 1.88.0
     cargo {{ toolchain }} update -p=actix-http --precise=3.11.2 # next ver: 1.88.0
 
