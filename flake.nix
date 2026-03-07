@@ -23,11 +23,12 @@
             buildInputs = [ x52just ];
 
             packages = [
-              pkgs.just
-              pkgs.fd
-              pkgs.taplo
-              pkgs.nodePackages.prettier
               config.formatter
+              pkgs.cargo-shear
+              pkgs.fd
+              pkgs.just
+              pkgs.nodePackages.prettier
+              pkgs.taplo
             ] ++ lib.optional pkgs.stdenv.isDarwin [
               pkgs.pkgsBuildHost.libiconv
             ];

@@ -7,6 +7,7 @@ use der::{
 };
 use eyre::{eyre, WrapErr as _};
 use pkcs8::{DecodePrivateKey, EncodePrivateKey};
+use rustls_pki_types::{pem::SectionKind, CertificateDer};
 use x509_cert::{
     builder::{Builder, RequestBuilder as CsrBuilder},
     ext::pkix::{name::GeneralName, SubjectAltName},
@@ -97,10 +98,23 @@ impl Certificate {
     pub fn certificate_chain(&self) -> eyre::Result<Vec<Vec<u8>>> {
         let mut rdr = BufReader::new(Cursor::new(self.certificate()));
 
-        rustls_pemfile::certs(&mut rdr)
-            .map(|res| res.map(|cert| cert.to_vec()))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(Into::into)
+        // Use (SectionKind, Vec<u8>) to extract all PEM sections, then filter for certificates
+        let certs = rustls_pki_types::pem::ReadIter::new(&mut rdr)
+            .filter_map(|res| match res {
+                Ok((kind, der)) if kind == SectionKind::Certificate => {
+                    Some(CertificateDer::from(der))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        // Convert to Vec<Vec<u8>>
+        let certs = certs
+            .into_iter()
+            .map(|cert| cert.as_ref().to_vec())
+            .collect();
+
+        Ok(certs)
     }
 
     /// Inspect the certificate to count the number of (whole) valid days left.

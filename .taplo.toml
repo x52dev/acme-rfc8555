@@ -7,12 +7,12 @@ column_width = 100
 [[rule]]
 include = ["**/Cargo.toml"]
 keys = [
-    "dependencies",
-    "*-dependencies",
-    "workspace.dependencies",
-    "workspace.*-dependencies",
-    "target.*.dependencies",
-    "target.*.*-dependencies",
+  "dependencies",
+  "*-dependencies",
+  "workspace.dependencies",
+  "workspace.*-dependencies",
+  "target.*.dependencies",
+  "target.*.*-dependencies",
 ]
 formatting.reorder_keys = true
 formatting.align_comments = false
@@ -20,12 +20,12 @@ formatting.align_comments = false
 [[rule]]
 include = ["**/Cargo.toml"]
 keys = [
-    "dependencies.*",
-    "*-dependencies.*",
-    "workspace.dependencies.*",
-    "workspace.*-dependencies.*",
-    "target.*.dependencies",
-    "target.*.*-dependencies",
+  "dependencies.*",
+  "*-dependencies.*",
+  "workspace.dependencies.*",
+  "workspace.*-dependencies.*",
+  "target.*.dependencies",
+  "target.*.*-dependencies",
 ]
 formatting.reorder_keys = false
 formatting.align_comments = false
