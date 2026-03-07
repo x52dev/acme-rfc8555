@@ -37,7 +37,7 @@ eyre = "0.6"
 log = "0.4"
 p256 = { version = "0.13", features = ["pkcs8", "ecdsa-core"] }
 parking_lot = "0.12"
-pem = { package = "pem-rfc7468", version = "0.7" }
+pem = { package = "pem-rfc7468", version = "1" }
 pkcs8 = "0.10"
 rand = "0.8" # 0.9 waiting for p256 0.14
 reqwest = { version = "0.13", default-features = false, features = ["json"] }
