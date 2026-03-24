@@ -24,7 +24,7 @@ ignored = [
 
 [package.metadata.cargo_check_external_types]
 allowed_external_types = [
-  "std::*", #
+  "std::*", # standard library
 ]
 
 [lib]
