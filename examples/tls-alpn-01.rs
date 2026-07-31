@@ -105,7 +105,7 @@ async fn main() -> eyre::Result<()> {
     // Alternatively you can load a private key from elsewhere.
     let private_key = create_p256_key();
 
-    log::info!("submitting CSR for: {:?}", &csr.api_order().domains());
+    log::info!("submitting CSR for: {:?}", csr.api_order().domains());
 
     // Submit the CSR. This causes the ACME provider to enter a state of
     // "processing" that must be polled until the certificate is either issued
