@@ -4,6 +4,7 @@
 
 # direnv
 /.direnv/
+/.toolchain/
 
 # temp dirs for examples
 /acme-accounts/
