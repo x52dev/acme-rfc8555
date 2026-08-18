@@ -11,6 +11,7 @@ downgrade-for-msrv:
     cargo {{ toolchain }} update -p=time --precise=0.3.45 # next ver: 1.88.0
     cargo {{ toolchain }} update -p=actix-web --precise=4.12.0 # next ver: 1.88.0
     cargo {{ toolchain }} update -p=actix-http --precise=3.11.2 # next ver: 1.88.0
+    cargo {{ toolchain }} update -p=actix-server --precise=2.6.0 # next ver: 1.88.0
 
 # Check project
 check:
