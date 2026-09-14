@@ -27,7 +27,7 @@ jobs:
         uses: DeterminateSystems/flakehub-cache-action@v3
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1.5.0
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           components: llvm-tools-preview
 
