@@ -10,7 +10,7 @@ dependencies = [
  "actix-http",
  "actix-server",
  "actix-web",
- "base64 0.22.1",
+ "base64 0.23.1",
  "color-eyre",
  "der",
  "ecdsa",
