@@ -17,6 +17,5 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    versioning-strategy: lockfile-only
     cooldown:
       default-days: 7
