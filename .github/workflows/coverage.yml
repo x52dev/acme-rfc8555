@@ -15,8 +15,14 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     name: Coverage
+    permissions:
+      contents: read
+      id-token: write # Authenticate Codecov uploads with OIDC.
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Determinate Nix
         uses: DeterminateSystems/determinate-nix-action@8d87e8d5e5b8a8309d4281094560f127d9a265f1 # v3.22.5
@@ -47,5 +53,4 @@ jobs:
         with:
           files: codecov.json
           fail_ci_if_error: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true

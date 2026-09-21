@@ -18,7 +18,7 @@ concurrency:
 jobs:
   read_msrv:
     name: Read MSRV
-    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@main
+    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@2e4effc4a4a9437253f7f659990d4ac5ec9c7854 # main
 
   test:
     needs: read_msrv
@@ -36,6 +36,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Determinate Nix
         uses: DeterminateSystems/determinate-nix-action@8d87e8d5e5b8a8309d4281094560f127d9a265f1 # v3.22.5
