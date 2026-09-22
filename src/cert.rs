@@ -18,8 +18,41 @@ use x509_cert::{
 use zeroize::Zeroizing;
 
 /// Make a P-256 private key (from which we can derive a public key).
-pub fn create_p256_key() -> p256::ecdsa::SigningKey {
-    ecdsa::SigningKey::generate_from_rng(&mut rand::rng())
+pub fn create_p256_key() -> PrivateKey {
+    PrivateKey {
+        inner: ecdsa::SigningKey::generate_from_rng(&mut rand::rng()),
+    }
+}
+
+/// A P-256 private key for certificate issuance.
+///
+/// Generate a key with [`create_p256_key`] or import one with [`Self::from_pkcs8_pem`].
+#[derive(Clone)]
+pub struct PrivateKey {
+    inner: p256::ecdsa::SigningKey,
+}
+
+impl PrivateKey {
+    /// Imports a P-256 private key from PKCS#8 PEM.
+    pub fn from_pkcs8_pem(pem: &str) -> eyre::Result<Self> {
+        let inner = p256::ecdsa::SigningKey::from_pkcs8_pem(pem)
+            .context("Failed to read P-256 private key PEM")?;
+
+        Ok(Self { inner })
+    }
+
+    /// Exports the private key as PKCS#8 PEM with LF line endings.
+    ///
+    /// The returned string is zeroized when dropped.
+    pub fn to_pkcs8_pem(&self) -> eyre::Result<Zeroizing<String>> {
+        self.inner
+            .to_pkcs8_pem(pem::LineEnding::LF)
+            .context("Failed to encode P-256 private key PEM")
+    }
+
+    pub(crate) fn into_signing_key(self) -> p256::ecdsa::SigningKey {
+        self.inner
+    }
 }
 
 /// Creates a CSR with `domains` and signs it with `signer`.

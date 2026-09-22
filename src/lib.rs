@@ -71,6 +71,6 @@ mod test;
 
 pub use crate::{
     acc::{Account, RevocationReason},
-    cert::{create_p256_key, Certificate},
+    cert::{create_p256_key, Certificate, PrivateKey},
     dir::{Directory, DirectoryUrl},
 };

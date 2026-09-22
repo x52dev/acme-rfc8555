@@ -26,7 +26,6 @@ ignored = [
 allowed_external_types = [
   "std::*",
   "eyre::Result",
-  "p256::ecdsa::SigningKey",
   "serde_core::de::Deserialize",
   "serde_core::ser::Serialize",
   "zeroize::Zeroizing",

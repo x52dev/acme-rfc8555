@@ -14,7 +14,7 @@ pub(crate) struct AcmeKey {
 impl AcmeKey {
     /// Constructs new ACME key with random private key.
     pub(crate) fn new() -> AcmeKey {
-        Self::from_key(crate::create_p256_key())
+        Self::from_key(crate::create_p256_key().into_signing_key())
     }
 
     /// Constructs new ACME key from PEM-encoded private key.

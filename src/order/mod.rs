@@ -181,7 +181,8 @@ impl NewOrder {
 ///
 /// To finalize, the user supplies a private key (from which a public key is derived). This library
 /// provides [a function to create a P-256 private key](crate::create_p256_key()) (since this is the
-/// only private key type currently supported) but it can be created or retrieved in some other way.
+/// only private key type currently supported). Import an existing key with
+/// [`crate::PrivateKey::from_pkcs8_pem`].
 ///
 /// Let's Encrypt [supports] this key type, but if an alternative ACME provider does not support
 /// this algorithm, it will show as an error when finalizing the order.
@@ -202,11 +203,13 @@ impl CsrOrder {
     /// each poll attempt.
     pub async fn finalize(
         mut self,
-        private_key: p256::ecdsa::SigningKey,
+        private_key: crate::PrivateKey,
         interval: Duration,
     ) -> eyre::Result<CertOrder> {
         // the domains that we have authorized
         let domains = self.order.api_order.domains();
+
+        let private_key = private_key.into_signing_key();
 
         let csr = create_csr(&private_key, &domains)?;
 
