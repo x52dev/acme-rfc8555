@@ -6,19 +6,20 @@ use der::{
     Decode as _, DecodePem as _,
 };
 use eyre::{eyre, WrapErr as _};
+use p256::elliptic_curve::Generate as _;
 use pkcs8::{DecodePrivateKey, EncodePrivateKey};
 use rustls_pki_types::{pem::SectionKind, CertificateDer};
 use x509_cert::{
-    builder::{Builder, RequestBuilder as CsrBuilder},
+    builder::Builder,
     ext::pkix::{name::GeneralName, SubjectAltName},
     name::Name,
+    request::RequestBuilder as CsrBuilder,
 };
 use zeroize::Zeroizing;
 
 /// Make a P-256 private key (from which we can derive a public key).
 pub fn create_p256_key() -> p256::ecdsa::SigningKey {
-    let csprng = &mut rand::thread_rng();
-    ecdsa::SigningKey::from(p256::SecretKey::random(csprng))
+    ecdsa::SigningKey::generate_from_rng(&mut rand::rng())
 }
 
 /// Creates a CSR with `domains` and signs it with `signer`.
@@ -32,7 +33,7 @@ pub(crate) fn create_csr(
     let primary_domain = domains.first().unwrap();
     let subject = format!("CN={primary_domain}").parse::<Name>().unwrap();
 
-    let mut csr = CsrBuilder::new(subject, signer).unwrap();
+    let mut csr = CsrBuilder::new(subject).unwrap();
 
     if domains.len() > 1 {
         csr.add_extension(&SubjectAltName(
@@ -44,7 +45,7 @@ pub(crate) fn create_csr(
         .unwrap();
     }
 
-    csr.build::<p256::ecdsa::DerSignature>()
+    csr.build::<_, p256::ecdsa::DerSignature>(signer)
         .context("build csr")
 }
 
@@ -135,7 +136,7 @@ impl Certificate {
 
         let cert = x509_cert::Certificate::from_der(cert_ee)?;
 
-        let not_after = cert.tbs_certificate.validity.not_after.to_date_time();
+        let not_after = cert.tbs_certificate().validity().not_after.to_date_time();
         // TODO: justify assume_utc
         let not_after = PrimitiveDateTime::try_from(not_after).unwrap().assume_utc();
 

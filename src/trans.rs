@@ -208,10 +208,7 @@ fn jws_with<T: Serialize + ?Sized>(
     };
 
     let to_sign = format!("{header}.{payload}");
-    let (signature, _rec_id) = key
-        .private_key()
-        .sign_recoverable(to_sign.as_bytes())
-        .unwrap();
+    let (signature, _rec_id) = key.private_key().sign_recoverable(to_sign.as_bytes());
 
     let signature = BASE64_URL_SAFE_NO_PAD.encode(signature.to_bytes());
 
