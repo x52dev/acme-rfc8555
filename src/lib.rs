@@ -6,9 +6,52 @@
 //!
 //! # Usage
 //!
-//! - This crate exposes a library which is referenced as `acme`. This name is used throughout these
-//!   docs, not `acme_rfc855`, which would be awkward to write every time.
-//! - TODO
+//! Import this crate as `acme`. Network operations are asynchronous and require a Tokio runtime.
+//!
+//! Start by fetching a [`Directory`] and registering an [`Account`]. Registration sends agreement
+//! to the provider's terms of service. Review those terms before registering.
+//!
+//! ```no_run
+//! use acme::{Directory, DirectoryUrl};
+//!
+//! # async fn example() -> eyre::Result<()> {
+//! let directory = Directory::fetch(DirectoryUrl::LetsEncryptStaging).await?;
+//! let account = directory
+//!     .register_account(Some(vec!["mailto:admin@example.com".to_owned()]))
+//!     .await?;
+//!
+//! // Store this secret securely so that you can load the same account later.
+//! let account_key = account.acme_private_key_pem()?;
+//! let order = account.new_order("example.com", &["www.example.com"]).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! To issue a certificate:
+//!
+//! 1. Create an order with [`Account::new_order`].
+//! 2. Fetch its [`authorizations`]. For each authorization that needs a challenge, choose an
+//!    available challenge and publish its proof through your HTTP server, DNS server, or TLS server.
+//!    This crate provides the proof data; your application must make it available to the provider.
+//! 3. Call [`order::Challenge::validate`] after the proof is available.
+//! 4. Call [`order::NewOrder::refresh`] to update the order status, then use
+//!    [`order::NewOrder::confirm_validations`] to obtain a [`order::CsrOrder`] when ready.
+//! 5. Supply a certificate key to [`order::CsrOrder::finalize`], then call
+//!    [`order::CertOrder::download_cert`] to retrieve the certificate and its private key.
+//!
+//! Certificate keys currently use P-256. Generate one with [`create_p256_key`] or import an existing
+//! PKCS#8 PEM key with [`PrivateKey::from_pkcs8_pem`]. The certificate key is separate from the account
+//! key used to sign ACME requests.
+//!
+//! ## Account and certificate storage
+//!
+//! This crate does not persist accounts or certificates. Store the account key returned by
+//! [`Account::acme_private_key_pem`] and use [`Directory::load_existing_account`] to resume work with
+//! that account. Use the same provider directory when loading it.
+//!
+//! Store both [`Certificate::certificate`] and [`Certificate::private_key`] after issuance.
+//! Protect private keys from unauthorized access. A later process can load the saved PEM data with
+//! [`Certificate::parse`].
 //!
 //! ## Examples
 //!
