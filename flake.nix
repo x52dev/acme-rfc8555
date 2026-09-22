@@ -14,9 +14,15 @@
       imports = [ inputs.x52.flakeModules.default ];
 
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
-      perSystem = { pkgs, config, system, lib, ... }:
+      perSystem = { pkgs, config, inputs', system, lib, ... }:
         {
           formatter = pkgs.nixpkgs-fmt;
+
+          devShells.ci-release = pkgs.mkShellNoCC {
+            packages = [
+              inputs'.x52.packages.x52-release-tools
+            ];
+          };
 
           devShells.default = pkgs.mkShell {
             packages = [
