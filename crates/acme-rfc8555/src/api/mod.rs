@@ -108,4 +108,53 @@ mod tests {
         let x = serde_json::to_string(&EmptyObject).unwrap();
         assert_eq!("{}", x);
     }
+
+    #[test]
+    fn bad_nonce_matches_only_the_bad_nonce_type() {
+        let problem = Problem {
+            _type: "badNonce".to_owned(),
+            ..Default::default()
+        };
+
+        assert!(problem.is_bad_nonce());
+        assert!(!Problem::default().is_bad_nonce());
+    }
+
+    #[test]
+    fn jws_verification_error_accepts_both_malformed_types() {
+        for problem_type in [
+            "urn:ietf:params:acme:error:malformed",
+            "urn:acme:error:malformed",
+        ] {
+            let problem = Problem {
+                _type: problem_type.to_owned(),
+                detail: Some("JWS verification error".to_owned()),
+                ..Default::default()
+            };
+
+            assert!(problem.is_jws_verification_error(), "{problem_type}");
+        }
+    }
+
+    #[test]
+    fn jws_verification_error_requires_exact_detail() {
+        let problem = Problem {
+            _type: "urn:ietf:params:acme:error:malformed".to_owned(),
+            detail: Some("other malformed request".to_owned()),
+            ..Default::default()
+        };
+
+        assert!(!problem.is_jws_verification_error());
+    }
+
+    #[test]
+    fn jws_verification_error_requires_malformed_type() {
+        let problem = Problem {
+            _type: "urn:ietf:params:acme:error:unauthorized".to_owned(),
+            detail: Some("JWS verification error".to_owned()),
+            ..Default::default()
+        };
+
+        assert!(!problem.is_jws_verification_error());
+    }
 }
