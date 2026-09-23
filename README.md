@@ -23,7 +23,6 @@ Originally a fork of [acme-micro](https://github.com/kpcyrd/acme-micro) and [acm
 
 - [x] No OpenSSL
 - [x] RFC 8555 compliance
-- [ ] Full documentation
 - [ ] Full test suite
 - [ ] Support multiple certificate key types
 
