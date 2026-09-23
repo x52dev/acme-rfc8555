@@ -1,10 +1,8 @@
 #![allow(clippy::trivial_regex)]
 
-use std::{convert::Infallible, future::ready, net::TcpListener, sync::OnceLock};
+use std::sync::OnceLock;
 
-use actix_http::{HttpService, Method, Request, Response, StatusCode};
-use actix_server::{Server, ServerHandle};
-use actix_web::body::MessageBody;
+use actix_web::{web, App, HttpRequest, HttpResponse};
 use regex::Regex;
 
 static RE_URL: OnceLock<Regex> = OnceLock::new();
@@ -15,16 +13,15 @@ fn re_url() -> &'static Regex {
 
 pub struct TestServer {
     pub dir_url: String,
-    handle: ServerHandle,
+    _server: actix_test::TestServer,
 }
 
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        drop(self.handle.stop(false));
-    }
+fn base_url(req: &HttpRequest) -> String {
+    let connection = req.connection_info();
+    format!("{}://{}", connection.scheme(), connection.host())
 }
 
-fn get_directory(url: &str) -> Response<impl MessageBody> {
+async fn get_directory(req: HttpRequest) -> HttpResponse {
     const BODY: &str = r#"{
     "keyChange": "<URL>/acme/key-change",
     "newAccount": "<URL>/acme/new-acct",
@@ -38,16 +35,17 @@ fn get_directory(url: &str) -> Response<impl MessageBody> {
     }
     }"#;
 
-    Response::with_body(
-        StatusCode::OK,
-        RE_URL
-            .get_or_init(|| Regex::new("<URL>").unwrap())
-            .replace_all(BODY, url),
-    )
+    let url = base_url(&req);
+    let body = RE_URL
+        .get_or_init(|| Regex::new("<URL>").unwrap())
+        .replace_all(BODY, url.as_str())
+        .into_owned();
+
+    HttpResponse::Ok().body(body)
 }
 
-fn head_new_nonce() -> Response<impl MessageBody> {
-    Response::build(StatusCode::NO_CONTENT)
+async fn head_new_nonce() -> HttpResponse {
+    HttpResponse::NoContent()
         .insert_header((
             "Replay-Nonce",
             "8_uBBV3N2DBRJczhoiB46ugJKUkUHxGzVe6xIMpjHFM",
@@ -55,7 +53,7 @@ fn head_new_nonce() -> Response<impl MessageBody> {
         .finish()
 }
 
-fn post_new_acct(url: &str) -> Response<impl MessageBody> {
+async fn post_new_acct(req: HttpRequest) -> HttpResponse {
     const BODY: &str = r#"{
     "id": 7728515,
     "key": {
@@ -74,16 +72,17 @@ fn post_new_acct(url: &str) -> Response<impl MessageBody> {
     "status": "valid"
     }"#;
 
+    let url = base_url(&req);
     let location = re_url()
-        .replace_all("<URL>/acme/acct/7728515", url)
+        .replace_all("<URL>/acme/acct/7728515", url.as_str())
         .into_owned();
 
-    Response::build(StatusCode::CREATED)
+    HttpResponse::Created()
         .insert_header(("Location", location))
         .body(BODY)
 }
 
-fn post_new_order(url: &str) -> Response<impl MessageBody> {
+async fn post_new_order(req: HttpRequest) -> HttpResponse {
     const BODY: &str = r#"{
     "status": "pending",
     "expires": "2019-01-09T08:26:43.570360537Z",
@@ -99,16 +98,17 @@ fn post_new_order(url: &str) -> Response<impl MessageBody> {
     "finalize": "<URL>/acme/finalize/7738992/18234324"
     }"#;
 
+    let url = base_url(&req);
     let location = re_url()
-        .replace_all("<URL>/acme/order/YTqpYUthlVfwBncUufE8", url)
+        .replace_all("<URL>/acme/order/YTqpYUthlVfwBncUufE8", url.as_str())
         .into_owned();
 
-    Response::build(StatusCode::CREATED)
+    HttpResponse::Created()
         .insert_header(("Location", location))
-        .body(re_url().replace_all(BODY, url))
+        .body(re_url().replace_all(BODY, url.as_str()).into_owned())
 }
 
-fn post_get_order(url: &str) -> Response<impl MessageBody> {
+async fn post_get_order(req: HttpRequest) -> HttpResponse {
     const BODY: &str = r#"{
     "status": "<STATUS>",
     "expires": "2019-01-09T08:26:43.570360537Z",
@@ -125,12 +125,13 @@ fn post_get_order(url: &str) -> Response<impl MessageBody> {
     "certificate": "<URL>/acme/cert/fae41c070f967713109028"
     }"#;
 
-    let body = re_url().replace_all(BODY, url).into_owned();
+    let url = base_url(&req);
+    let body = re_url().replace_all(BODY, url.as_str()).into_owned();
 
-    Response::build(StatusCode::OK).body(body)
+    HttpResponse::Ok().body(body)
 }
 
-fn post_authz(url: &str) -> Response<impl MessageBody> {
+async fn post_authz(req: HttpRequest) -> HttpResponse {
     const BODY: &str = r#"{
         "identifier": {
             "type": "dns",
@@ -160,70 +161,47 @@ fn post_authz(url: &str) -> Response<impl MessageBody> {
         ]
     }"#;
 
-    Response::build(StatusCode::CREATED).body(re_url().replace_all(BODY, url))
+    let url = base_url(&req);
+    HttpResponse::Created().body(re_url().replace_all(BODY, url.as_str()).into_owned())
 }
 
-fn post_finalize(_url: &str) -> Response<impl MessageBody> {
-    Response::ok()
+async fn post_finalize() -> HttpResponse {
+    HttpResponse::Ok().finish()
 }
 
-fn post_certificate(_url: &str) -> Response<impl MessageBody> {
-    Response::build(StatusCode::OK).body("CERT HERE")
-}
-
-fn route_request(req: Request, url: &str) -> Response<impl MessageBody> {
-    match (req.method(), req.path()) {
-        (&Method::GET, "/directory") => get_directory(url).map_into_boxed_body(),
-        (&Method::HEAD, "/acme/new-nonce") => head_new_nonce().map_into_boxed_body(),
-        (&Method::POST, "/acme/new-acct") => post_new_acct(url).map_into_boxed_body(),
-        (&Method::POST, "/acme/new-order") => post_new_order(url).map_into_boxed_body(),
-
-        (&Method::POST, "/acme/order/YTqpYUthlVfwBncUufE8") => {
-            post_get_order(url).map_into_boxed_body()
-        }
-
-        (&Method::POST, "/acme/authz/YTqpYUthlVfwBncUufE8IRWLMSRqcSs") => {
-            post_authz(url).map_into_boxed_body()
-        }
-
-        (&Method::POST, "/acme/finalize/7738992/18234324") => {
-            post_finalize(url).map_into_boxed_body()
-        }
-
-        (&Method::POST, "/acme/cert/fae41c070f967713109028") => {
-            post_certificate(url).map_into_boxed_body()
-        }
-
-        (_, _) => Response::build(StatusCode::NOT_FOUND)
-            .finish()
-            .map_into_boxed_body(),
-    }
+async fn post_certificate() -> HttpResponse {
+    HttpResponse::Ok().body("CERT HERE")
 }
 
 pub fn with_directory_server() -> TestServer {
-    let lst = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = lst.local_addr().unwrap().port();
+    let server = actix_test::start(|| {
+        App::new()
+            .route("/directory", web::get().to(get_directory))
+            .route("/acme/new-nonce", web::head().to(head_new_nonce))
+            .route("/acme/new-acct", web::post().to(post_new_acct))
+            .route("/acme/new-order", web::post().to(post_new_order))
+            .route(
+                "/acme/order/YTqpYUthlVfwBncUufE8",
+                web::post().to(post_get_order),
+            )
+            .route(
+                "/acme/authz/YTqpYUthlVfwBncUufE8IRWLMSRqcSs",
+                web::post().to(post_authz),
+            )
+            .route(
+                "/acme/finalize/7738992/18234324",
+                web::post().to(post_finalize),
+            )
+            .route(
+                "/acme/cert/fae41c070f967713109028",
+                web::post().to(post_certificate),
+            )
+    });
 
-    let url = format!("http://127.0.0.1:{port}");
-    let dir_url = format!("{url}/directory");
-
-    let server = Server::build()
-        .listen("acme", lst, move || {
-            let url = url.clone();
-
-            HttpService::build()
-                .finish(move |req| ready(Ok::<_, Infallible>(route_request(req, &url))))
-                .tcp()
-        })
-        .unwrap()
-        .workers(1)
-        .run();
-
-    let handle = server.handle();
-
-    tokio::spawn(server);
-
-    TestServer { dir_url, handle }
+    TestServer {
+        dir_url: server.url("/directory"),
+        _server: server,
+    }
 }
 
 #[tokio::test]

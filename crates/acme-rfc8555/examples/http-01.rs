@@ -11,7 +11,7 @@ const CERTIFICATE_DIR: &str = "./acme-certificates";
 const DOMAINS: &[&str] = &["example.org"];
 const CONTACT_EMAIL: Option<&str> = None;
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
@@ -39,7 +39,7 @@ async fn main() -> eyre::Result<()> {
     .run();
 
     let srv_handle = srv.handle();
-    let srv_task = actix_web::rt::spawn(srv);
+    let srv_task = tokio::spawn(srv);
 
     log::info!("fetching LetsEncrypt directory");
     // Create a directory entrypoint.
