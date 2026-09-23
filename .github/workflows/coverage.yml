@@ -20,7 +20,8 @@ jobs:
       id-token: write # Authenticate Codecov uploads with OIDC.
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -32,13 +33,13 @@ jobs:
         with:
           components: llvm-tools-preview
 
-      - name: Enter Nix devshell
-        uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
-
       - name: Install cargo-llvm-cov,cargo-nextest
         uses: taiki-e/install-action@4076c08d76dba979c11a7285295b0716c1d67908 # v2.87.15
         with:
           tool: cargo-llvm-cov,cargo-nextest
+
+      - name: Enter Nix devshell
+        uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
 
       - name: Generate code coverage
         env:
