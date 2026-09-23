@@ -329,7 +329,7 @@ mod tests {
     use super::*;
     use crate::*;
 
-    async fn pending_auth() -> Auth {
+    async fn pending_auth() -> (acme_test_server::TestServer, Auth) {
         let server = acme_test_server::with_directory_server();
         let directory = Directory::fetch(DirectoryUrl::Other(&server.dir_url))
             .await
@@ -340,7 +340,21 @@ mod tests {
             .await
             .unwrap();
 
-        order.authorizations().await.unwrap().remove(0)
+        let auth = order.authorizations().await.unwrap().remove(0);
+
+        (server, auth)
+    }
+
+    fn validation_challenge(
+        server: &acme_test_server::TestServer,
+        auth: &Auth,
+        auth_path: &str,
+    ) -> Challenge<Http> {
+        let mut challenge = auth.http_challenge().unwrap();
+        challenge.api_challenge.url = server.url("/test/validation/challenge");
+        challenge.auth_url = server.url(auth_path);
+
+        challenge
     }
 
     fn expected_key_authorization(auth: &Auth, token: &str) -> String {
@@ -379,7 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn http_proof_matches_key_authorization() {
-        let auth = pending_auth().await;
+        let (_server, auth) = pending_auth().await;
         let challenge = auth.http_challenge().unwrap();
         let expected = expected_key_authorization(&auth, challenge.http_token());
 
@@ -388,7 +402,7 @@ mod tests {
 
     #[tokio::test]
     async fn dns_proof_matches_key_authorization_digest() {
-        let auth = pending_auth().await;
+        let (_server, auth) = pending_auth().await;
         let challenge = auth.dns_challenge().unwrap();
         let authorization = expected_key_authorization(&auth, &challenge.api_challenge().token);
         let expected = BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(authorization));
@@ -398,7 +412,7 @@ mod tests {
 
     #[tokio::test]
     async fn tls_alpn_proof_hashes_the_key_authorization() {
-        let auth = pending_auth().await;
+        let (_server, auth) = pending_auth().await;
         let challenge = auth.tls_alpn_challenge().unwrap();
         let authorization = expected_key_authorization(&auth, &challenge.api_challenge().token);
         let digest: [u8; 32] = Sha256::digest(authorization).into();
@@ -408,7 +422,7 @@ mod tests {
 
     #[tokio::test]
     async fn valid_authorization_needs_no_challenge() {
-        let mut auth = pending_auth().await;
+        let (_server, mut auth) = pending_auth().await;
         auth.api_auth.status = api::AuthorizationStatus::Valid;
 
         assert!(!auth.need_challenge());
@@ -416,10 +430,47 @@ mod tests {
 
     #[tokio::test]
     async fn validated_challenge_needs_no_validation() {
-        let auth = pending_auth().await;
+        let (_server, auth) = pending_auth().await;
         let mut challenge = auth.http_challenge().unwrap();
         challenge.api_challenge.status = api::ChallengeStatus::Valid;
 
         assert!(!challenge.need_validate());
+    }
+
+    #[tokio::test]
+    async fn validation_polls_until_authorization_is_valid() {
+        let (server, auth) = pending_auth().await;
+        let challenge = validation_challenge(&server, &auth, "/test/validation/pending-then-valid");
+
+        tokio::time::timeout(Duration::from_secs(5), challenge.validate(Duration::ZERO))
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn validation_reports_challenge_error() {
+        let (server, auth) = pending_auth().await;
+        let challenge = validation_challenge(&server, &auth, "/test/validation/invalid-error");
+
+        let error = challenge.validate(Duration::ZERO).await.unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Validation failed: urn:ietf:params:acme:error:dns: DNS lookup failed (subproblems: None)"
+        );
+    }
+
+    #[tokio::test]
+    async fn validation_reports_missing_challenge_error() {
+        let (server, auth) = pending_auth().await;
+        let challenge = validation_challenge(&server, &auth, "/test/validation/invalid-no-error");
+
+        let error = challenge.validate(Duration::ZERO).await.unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Validation failed: Validation failed and no error found"
+        );
     }
 }
