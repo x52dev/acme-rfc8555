@@ -20,6 +20,13 @@ pub struct TestServer {
     _server: actix_test::TestServer,
 }
 
+impl TestServer {
+    /// Returns the URL for a path on this test server.
+    pub fn url(&self, path: &str) -> String {
+        self._server.url(path)
+    }
+}
+
 fn base_url(req: &HttpRequest) -> String {
     let connection = req.connection_info();
     format!("{}://{}", connection.scheme(), connection.host())
@@ -177,6 +184,24 @@ async fn post_certificate() -> HttpResponse {
     HttpResponse::Ok().body("CERT HERE")
 }
 
+async fn get_problem() -> HttpResponse {
+    HttpResponse::BadRequest()
+        .insert_header(("content-type", "application/problem+json"))
+        .body(r#"{"type":"badNonce","detail":"nonce expired"}"#)
+}
+
+async fn get_malformed_problem() -> HttpResponse {
+    HttpResponse::BadRequest()
+        .insert_header(("content-type", "application/problem+json"))
+        .body("not json")
+}
+
+async fn get_plain_error() -> HttpResponse {
+    HttpResponse::BadRequest()
+        .insert_header(("content-type", "text/plain"))
+        .body("upstream failure")
+}
+
 /// Starts a server that returns fixed ACME directory and resource responses.
 pub fn with_directory_server() -> TestServer {
     let server = actix_test::start(|| {
@@ -201,6 +226,12 @@ pub fn with_directory_server() -> TestServer {
                 "/acme/cert/fae41c070f967713109028",
                 web::post().to(post_certificate),
             )
+            .route("/test/problem", web::get().to(get_problem))
+            .route(
+                "/test/malformed-problem",
+                web::get().to(get_malformed_problem),
+            )
+            .route("/test/plain-error", web::get().to(get_plain_error))
     });
 
     TestServer {

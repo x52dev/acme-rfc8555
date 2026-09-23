@@ -1,4 +1,4 @@
-use acme::api::{Account, DirectoryMeta, Problem};
+use acme::api::{Account, DirectoryMeta, Identifier, Problem, Revocation};
 
 #[test]
 fn account_status_matches_the_exact_server_value() {
@@ -71,4 +71,52 @@ fn problem_display_omits_missing_detail() {
     };
 
     assert_eq!(problem.to_string(), "badNonce");
+}
+
+#[test]
+fn identifier_recognizes_only_dns_type() {
+    let dns = Identifier {
+        _type: "dns".to_owned(),
+        value: "example.com".to_owned(),
+    };
+    let ip = Identifier {
+        _type: "ip".to_owned(),
+        value: "192.0.2.1".to_owned(),
+    };
+
+    assert!(dns.is_type_dns());
+    assert!(!ip.is_type_dns());
+}
+
+#[test]
+fn revocation_omits_unspecified_reason() {
+    let revocation = Revocation::new("certificate-der".to_owned(), None);
+
+    assert_eq!(
+        serde_json::to_value(revocation).unwrap(),
+        serde_json::json!({"certificate": "certificate-der"})
+    );
+}
+
+#[test]
+fn revocation_serializes_reason_code() {
+    let revocation = Revocation::new("certificate-der".to_owned(), Some(1));
+
+    assert_eq!(
+        serde_json::to_value(revocation).unwrap(),
+        serde_json::json!({"certificate": "certificate-der", "reason": 1})
+    );
+}
+
+#[test]
+fn problem_converts_to_displayable_error() {
+    let problem = Problem {
+        _type: "badNonce".to_owned(),
+        detail: Some("nonce expired".to_owned()),
+        ..Default::default()
+    };
+
+    let error = eyre::Error::from(problem);
+
+    assert_eq!(error.to_string(), "badNonce: nonce expired");
 }
