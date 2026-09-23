@@ -10,4 +10,4 @@ coverage:
         threshold: 100% # make CI green
 
 ignore:
-  - "examples"
+  - "crates/acme-rfc8555/examples"

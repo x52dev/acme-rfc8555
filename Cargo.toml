@@ -1,73 +1,8 @@
-[package]
-name = "acme-rfc8555"
-version = "0.4.1"
-description = "Provision certificates from ACME providers"
-authors = [
-  "Martin Algesten <martin@algesten.se>",
-  "kpcyrd <git@rxv.cc>",
-  "Rob Ede <robjtede@icloud.com>",
-]
-categories = ["web-programming", "api-bindings"]
-keywords = ["acme", "certificate", "tls", "letsencrypt", "lets-encrypt"]
-repository = "https://github.com/x52dev/acme-rfc8555"
-license = "MIT"
-edition = "2021"
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
 rust-version = "1.88"
-
-[package.metadata.docs.rs]
-all-features = true
-
-[package.metadata.cargo-shear]
-ignored = [
-  "time", # specified for features
-]
-
-[package.metadata.cargo_check_external_types]
-allowed_external_types = [
-  "std::*",
-  "eyre::Result",
-  "serde_core::de::Deserialize",
-  "serde_core::ser::Serialize",
-  "zeroize::Zeroizing",
-]
-
-[lib]
-name = "acme"
-
-[features]
-default = ["reqwest/rustls"]
-
-[dependencies]
-base64 = "0.23"
-der = { version = "0.8", features = ["std", "time"] }
-ecdsa = { version = "0.17", features = ["algorithm"] }
-eyre = "0.6"
-log = "0.4"
-p256 = { version = "0.14", features = ["pkcs8", "ecdsa-core"] }
-parking_lot = "0.12"
-pem = { package = "pem-rfc7468", version = "1" }
-pkcs8 = "0.11"
-rand = "0.10"
-reqwest = { version = "0.13", default-features = false, features = ["json"] }
-rustls-pki-types = { version = "1.9", features = ["std"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sha2 = { version = "0.11", features = ["oid"] }
-time = { version = "0.3", default-features = false, features = ["std"] }
-tokio = { version = "1.24.2", features = ["time"] }
-x509-cert = { version = "0.3", features = ["pem", "builder"] }
-zeroize = "1"
-
-[dev-dependencies]
-actix-files = "0.6"
-actix-http = "3.5"
-actix-server = "2"
-actix-web = { version = "4", default-features = false, features = ["http2", "macros"] }
-color-eyre = "0.6"
-env_logger = "0.11"
-error_reporter = "1"
-rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
-regex = "1.4"
-rustls = "0.23"
-rustls-webpki = "0.103"
-tokio = { version = "1.38.2", features = ["full"] }
+license-file = "LICENSE"
+readme = "README.md"
