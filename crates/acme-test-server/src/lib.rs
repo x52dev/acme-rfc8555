@@ -1,3 +1,5 @@
+//! A local ACME directory server for tests.
+
 #![allow(clippy::trivial_regex)]
 
 use std::sync::OnceLock;
@@ -11,7 +13,9 @@ fn re_url() -> &'static Regex {
     RE_URL.get_or_init(|| regex::Regex::new("<URL>").unwrap())
 }
 
+/// A running test server that serves a fixed ACME directory.
 pub struct TestServer {
+    /// The URL of the ACME directory endpoint.
     pub dir_url: String,
     _server: actix_test::TestServer,
 }
@@ -173,6 +177,7 @@ async fn post_certificate() -> HttpResponse {
     HttpResponse::Ok().body("CERT HERE")
 }
 
+/// Starts a server that returns fixed ACME directory and resource responses.
 pub fn with_directory_server() -> TestServer {
     let server = actix_test::start(|| {
         App::new()
@@ -204,9 +209,12 @@ pub fn with_directory_server() -> TestServer {
     }
 }
 
-#[tokio::test]
-pub async fn test_make_directory() {
-    let server = with_directory_server();
-    let res = reqwest::get(&server.dir_url).await.unwrap();
-    assert!(res.status().is_success());
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn test_make_directory() {
+        let server = super::with_directory_server();
+        let res = reqwest::get(&server.dir_url).await.unwrap();
+        assert!(res.status().is_success());
+    }
 }

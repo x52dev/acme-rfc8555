@@ -183,7 +183,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_directory() {
-        let server = crate::test::with_directory_server();
+        let server = acme_test_server::with_directory_server();
 
         let url = DirectoryUrl::Other(&server.dir_url);
         let _dir = Directory::fetch(url).await.unwrap();
@@ -191,7 +191,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_account() {
-        let server = crate::test::with_directory_server();
+        let server = acme_test_server::with_directory_server();
 
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::fetch(url).await.unwrap();
