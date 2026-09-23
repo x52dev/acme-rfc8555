@@ -45,39 +45,15 @@ impl Order {
 }
 
 /// Helper to refresh an order status (POST-as-GET).
-pub(crate) async fn refresh_order(
-    acc: &Arc<AccountInner>,
-    url: String,
-    want_status: &'static str,
-) -> eyre::Result<Order> {
+pub(crate) async fn refresh_order(acc: &Arc<AccountInner>, url: String) -> eyre::Result<Order> {
     let res = acc.transport.call_kid(&url, &api::EmptyString).await?;
-
-    // our test rig requires the order to be in `want_status`.
-    // api_order_of is different for test compilation
-    let api_order = api_order_of(res, want_status).await?;
+    let api_order = res.json().await?;
 
     Ok(Order {
         acc: Arc::clone(acc),
         api_order,
         url,
     })
-}
-
-#[cfg(not(test))]
-async fn api_order_of(res: reqwest::Response, _want_status: &str) -> eyre::Result<api::Order> {
-    Ok(res.json().await?)
-}
-
-#[cfg(test)]
-// our test rig requires the order to be in `want_status`
-async fn api_order_of(res: reqwest::Response, want_status: &str) -> eyre::Result<api::Order> {
-    let body = res.text().await?;
-
-    #[allow(clippy::trivial_regex)]
-    let re = regex::Regex::new("<STATUS>").unwrap();
-    let body = re.replace_all(&body, want_status).into_owned();
-
-    Ok(serde_json::from_str::<api::Order>(&body)?)
 }
 
 /// A new order created by [`Account::new_order()`].
@@ -139,7 +115,7 @@ impl NewOrder {
     ///
     /// The specification calls this a "POST-as-GET" against the order URL.
     pub async fn refresh(&mut self) -> eyre::Result<()> {
-        let order = refresh_order(&self.order.acc, self.order.url.clone(), "ready").await?;
+        let order = refresh_order(&self.order.acc, self.order.url.clone()).await?;
         self.order.api_order.overwrite(order.api_order)?;
         Ok(())
     }
@@ -260,7 +236,7 @@ async fn poll_order_finalization(
     interval: Duration,
 ) -> eyre::Result<Order> {
     loop {
-        let order = refresh_order(acc, url.to_owned(), "valid").await?;
+        let order = refresh_order(acc, url.to_owned()).await?;
 
         if !matches!(order.api_order.status, Some(api::OrderStatus::Processing)) {
             return Ok(order);
@@ -311,27 +287,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_authorizations() {
-        let server = acme_test_server::with_directory_server();
-        let url = DirectoryUrl::Other(&server.dir_url);
+        let server = acme_test_server::start_server(Default::default());
+        let url = DirectoryUrl::Other(&server.directory_url);
         let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
             .unwrap();
-        let ord = acc.new_order("acme-test.example.com", &[]).await.unwrap();
+        let ord = acc.new_order("example.com", &[]).await.unwrap();
         let _authorizations = ord.authorizations().await.unwrap();
     }
 
     #[tokio::test]
     async fn test_finalize() {
-        let server = acme_test_server::with_directory_server();
-        let url = DirectoryUrl::Other(&server.dir_url);
+        let server = acme_test_server::start_server(Default::default());
+        let url = DirectoryUrl::Other(&server.directory_url);
         let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
             .unwrap();
-        let ord = acc.new_order("acme-test.example.com", &[]).await.unwrap();
+        let ord = acc.new_order("example.com", &[]).await.unwrap();
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
         let private_key = cert::create_p256_key();
@@ -343,14 +319,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_download_and_save_cert() {
-        let server = acme_test_server::with_directory_server();
-        let url = DirectoryUrl::Other(&server.dir_url);
+        let server = acme_test_server::start_server(Default::default());
+        let url = DirectoryUrl::Other(&server.directory_url);
         let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
             .unwrap();
-        let ord = acc.new_order("acme-test.example.com", &[]).await.unwrap();
+        let ord = acc.new_order("example.com", &[]).await.unwrap();
 
         // shortcut auth
         let ord = CsrOrder { order: ord.order };
@@ -361,8 +337,7 @@ mod tests {
             .unwrap();
 
         let cert = ord.download_cert().await.unwrap();
-        assert_eq!("CERT HERE", cert.certificate());
+        assert_eq!(cert.certificate_chain().unwrap().len(), 1);
         assert!(!cert.private_key().is_empty());
-        assert_eq!(cert.valid_days_left().unwrap(), 89);
     }
 }

@@ -60,9 +60,9 @@ pub struct Problem {
 }
 
 impl Problem {
-    /// Returns true if problem type is "badNonce".
+    /// Returns true if the problem reports an invalid or expired nonce.
     pub fn is_bad_nonce(&self) -> bool {
-        self._type == "badNonce"
+        self._type == "badNonce" || self._type == "urn:ietf:params:acme:error:badNonce"
     }
 
     /// Returns true if problem details indicate that JWS verification failed.

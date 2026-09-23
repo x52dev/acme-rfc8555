@@ -172,9 +172,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_order() {
-        let server = acme_test_server::with_directory_server();
+        let server = acme_test_server::start_server(Default::default());
 
-        let url = DirectoryUrl::Other(&server.dir_url);
+        let url = DirectoryUrl::Other(&server.directory_url);
         let dir = Directory::fetch(url).await.unwrap();
 
         let acc = dir
@@ -182,6 +182,6 @@ mod tests {
             .await
             .unwrap();
 
-        let _order = acc.new_order("acme-test.example.com", &[]).await.unwrap();
+        let _order = acc.new_order("example.com", &[]).await.unwrap();
     }
 }

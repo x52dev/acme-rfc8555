@@ -11,3 +11,4 @@ coverage:
 
 ignore:
   - "crates/acme-rfc8555/examples"
+  - "crates/acme-test-server"

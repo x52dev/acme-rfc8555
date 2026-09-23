@@ -3,7 +3,7 @@ use std::io::{BufReader, Cursor};
 use der::{
     asn1::Ia5String,
     time::{OffsetDateTime, PrimitiveDateTime},
-    Decode as _, DecodePem as _,
+    Decode as _,
 };
 use eyre::{eyre, WrapErr as _};
 use p256::elliptic_curve::Generate as _;
@@ -97,7 +97,7 @@ impl Certificate {
         }
     }
 
-    /// Loads a saved P-256 private key and certificate from PEM strings.
+    /// Loads a saved P-256 private key and certificate chain from PEM strings.
     ///
     /// The key must use PKCS#8 encoding. This method checks that the key and certificate can be
     /// decoded. It does not check that they match, that the certificate is trusted, or that it is
@@ -105,10 +105,27 @@ impl Certificate {
     ///
     /// # Errors
     ///
-    /// Returns an error if the certificate or P-256 private key cannot be decoded.
+    /// Returns an error if the chain has no certificates, a certificate cannot be decoded, or the
+    /// P-256 private key cannot be decoded.
     pub fn parse(private_key_pem: Zeroizing<String>, certificate: String) -> eyre::Result<Self> {
-        // validate certificate
-        x509_cert::Certificate::from_pem(certificate.as_str())?;
+        let mut has_certificate = false;
+
+        for section in
+            rustls_pki_types::pem::ReadIter::new(&mut BufReader::new(Cursor::new(&certificate)))
+        {
+            let (kind, der) = section?;
+
+            if kind != SectionKind::Certificate {
+                return Err(eyre!("unexpected PEM section in certificate chain"));
+            }
+
+            x509_cert::Certificate::from_der(&der)?;
+            has_certificate = true;
+        }
+
+        if !has_certificate {
+            return Err(eyre!("no certificates in chain"));
+        }
 
         // validate private key
         ecdsa::SigningKey::<p256::NistP256>::from_pkcs8_pem(&private_key_pem)?;
@@ -166,11 +183,6 @@ impl Certificate {
     ///
     /// It is possible to get negative days for an expired certificate.
     pub fn valid_days_left(&self) -> eyre::Result<i64> {
-        // the cert used in the tests is not valid to load as x509
-        if cfg!(test) {
-            return Ok(89);
-        }
-
         let cert_chain = self.certificate_chain()?;
         let cert_ee = cert_chain
             .first() // EE cert is first

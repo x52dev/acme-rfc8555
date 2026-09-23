@@ -23,7 +23,6 @@ dependencies = [
  "pkcs8",
  "rand 0.10.3",
  "rcgen",
- "regex",
  "reqwest",
  "rustls",
  "rustls-pki-types",
@@ -43,8 +42,9 @@ version = "0.1.0"
 dependencies = [
  "actix-test",
  "actix-web",
- "regex",
+ "rcgen",
  "reqwest",
+ "serde_json",
  "tokio",
 ]
 

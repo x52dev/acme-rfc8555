@@ -1,23 +1,70 @@
-//! A local ACME directory server for tests.
+//! Local ACME server for integration tests.
 
-#![allow(clippy::trivial_regex)]
+use std::sync::{Arc, Mutex};
 
-use std::sync::OnceLock;
+use actix_web::{
+    http::StatusCode,
+    web::{self, Data},
+    App, HttpRequest, HttpResponse,
+};
+use rcgen::{CertificateParams, KeyPair, PKCS_ECDSA_P256_SHA256};
+use serde_json::json;
 
-use actix_web::{web, App, HttpRequest, HttpResponse};
-use regex::Regex;
-
-static RE_URL: OnceLock<Regex> = OnceLock::new();
-
-fn re_url() -> &'static Regex {
-    RE_URL.get_or_init(|| regex::Regex::new("<URL>").unwrap())
+#[derive(Default)]
+struct AcmeState {
+    challenge_started: bool,
+    reject_challenge: bool,
+    reject_first_order_nonce: bool,
+    reject_unknown_account: bool,
+    reverse_order_identifiers: bool,
+    reject_finalization: bool,
+    omit_certificate_url: bool,
+    account_requests: usize,
+    order_requests: usize,
+    revocation_requests: usize,
+    authorization_polls: usize,
+    order_ready: bool,
+    finalized: bool,
+    finalization_polls: usize,
 }
 
-/// A running test server that serves a fixed ACME directory.
-pub struct TestServer {
-    /// The URL of the ACME directory endpoint.
-    pub dir_url: String,
+#[derive(Default)]
+pub struct AcmeServerConfig {
+    pub reject_challenge: bool,
+    pub reject_first_order_nonce: bool,
+    pub reject_unknown_account: bool,
+    pub reverse_order_identifiers: bool,
+    pub reject_finalization: bool,
+    pub omit_certificate_url: bool,
+}
+
+pub struct AcmeServer {
+    pub directory_url: String,
+    state: Arc<Mutex<AcmeState>>,
     _server: actix_test::TestServer,
+}
+
+struct ServerData {
+    certificate_pem: String,
+    state: Arc<Mutex<AcmeState>>,
+}
+
+impl AcmeServer {
+    pub fn account_requests(&self) -> usize {
+        self.state.lock().unwrap().account_requests
+    }
+
+    pub fn order_requests(&self) -> usize {
+        self.state.lock().unwrap().order_requests
+    }
+
+    pub fn revocation_requests(&self) -> usize {
+        self.state.lock().unwrap().revocation_requests
+    }
+
+    pub fn finalization_polls(&self) -> usize {
+        self.state.lock().unwrap().finalization_polls
+    }
 }
 
 fn base_url(req: &HttpRequest) -> String {
@@ -25,186 +72,235 @@ fn base_url(req: &HttpRequest) -> String {
     format!("{}://{}", connection.scheme(), connection.host())
 }
 
-async fn get_directory(req: HttpRequest) -> HttpResponse {
-    const BODY: &str = r#"{
-    "keyChange": "<URL>/acme/key-change",
-    "newAccount": "<URL>/acme/new-acct",
-    "newNonce": "<URL>/acme/new-nonce",
-    "newOrder": "<URL>/acme/new-order",
-    "revokeCert": "<URL>/acme/revoke-cert",
-    "meta": {
-        "caaIdentities": [
-        "testdir.org"
-        ]
-    }
-    }"#;
-
-    let url = base_url(&req);
-    let body = RE_URL
-        .get_or_init(|| Regex::new("<URL>").unwrap())
-        .replace_all(BODY, url.as_str())
-        .into_owned();
-
-    HttpResponse::Ok().body(body)
+fn json_response(value: serde_json::Value) -> HttpResponse {
+    HttpResponse::Ok().json(value)
 }
 
-async fn head_new_nonce() -> HttpResponse {
+async fn directory(req: HttpRequest) -> HttpResponse {
+    let base_url = base_url(&req);
+
+    json_response(json!({
+        "newNonce": format!("{base_url}/nonce"),
+        "newAccount": format!("{base_url}/account"),
+        "newOrder": format!("{base_url}/new-order"),
+        "revokeCert": format!("{base_url}/revoke"),
+        "keyChange": format!("{base_url}/key-change"),
+    }))
+}
+
+async fn nonce() -> HttpResponse {
     HttpResponse::NoContent()
-        .insert_header((
-            "Replay-Nonce",
-            "8_uBBV3N2DBRJczhoiB46ugJKUkUHxGzVe6xIMpjHFM",
-        ))
+        .insert_header(("Replay-Nonce", "dGVzdC1ub25jZQ"))
         .finish()
 }
 
-async fn post_new_acct(req: HttpRequest) -> HttpResponse {
-    const BODY: &str = r#"{
-    "id": 7728515,
-    "key": {
-        "use": "sig",
-        "kty": "EC",
-        "crv": "P-256",
-        "alg": "ES256",
-        "x": "ttpobTRK2bw7ttGBESRO7Nb23mbIRfnRZwunL1W6wRI",
-        "y": "h2Z00J37_2qRKH0-flrHEsH0xbit915Tyvd2v_CAOSk"
-    },
-    "contact": [
-        "mailto:foo@bar.com"
-    ],
-    "initialIp": "90.171.37.12",
-    "createdAt": "2018-12-31T17:15:40.399104457Z",
-    "status": "valid"
-    }"#;
+async fn account(req: HttpRequest, data: Data<ServerData>) -> HttpResponse {
+    let mut state = data.state.lock().unwrap();
+    state.account_requests += 1;
 
-    let url = base_url(&req);
-    let location = re_url()
-        .replace_all("<URL>/acme/acct/7728515", url.as_str())
-        .into_owned();
+    if state.reject_unknown_account {
+        HttpResponse::BadRequest()
+            .insert_header(("Content-Type", "application/problem+json"))
+            .body(json!({"type": "urn:ietf:params:acme:error:accountDoesNotExist"}).to_string())
+    } else {
+        let status = if state.account_requests == 1 {
+            StatusCode::CREATED
+        } else {
+            StatusCode::OK
+        };
 
-    HttpResponse::Created()
-        .insert_header(("Location", location))
-        .body(BODY)
+        HttpResponse::build(status)
+            .insert_header(("Location", format!("{}/account/1", base_url(&req))))
+            .body(r#"{"status":"valid"}"#)
+    }
 }
 
-async fn post_new_order(req: HttpRequest) -> HttpResponse {
-    const BODY: &str = r#"{
-    "status": "pending",
-    "expires": "2019-01-09T08:26:43.570360537Z",
-    "identifiers": [
-        {
-        "type": "dns",
-        "value": "acme-test.example.com"
+async fn new_order(req: HttpRequest, data: Data<ServerData>) -> HttpResponse {
+    let mut state = data.state.lock().unwrap();
+    state.order_requests += 1;
+
+    if state.reject_first_order_nonce && state.order_requests == 1 {
+        HttpResponse::BadRequest()
+            .insert_header(("Content-Type", "application/problem+json"))
+            .insert_header(("Replay-Nonce", "cmV0cnktbm9uY2U"))
+            .body(json!({"type": "urn:ietf:params:acme:error:badNonce"}).to_string())
+    } else {
+        let identifiers = if state.reverse_order_identifiers {
+            vec![
+                json!({"type": "dns", "value": "www.example.com"}),
+                json!({"type": "dns", "value": "example.com"}),
+            ]
+        } else {
+            vec![json!({"type": "dns", "value": "example.com"})]
+        };
+
+        let base_url = base_url(&req);
+
+        HttpResponse::Created()
+            .insert_header(("Location", format!("{base_url}/order/1")))
+            .body(
+                json!({
+                    "status": "pending",
+                    "identifiers": identifiers,
+                    "authorizations": [format!("{base_url}/authorization/1")],
+                    "finalize": format!("{base_url}/finalize/1"),
+                })
+                .to_string(),
+            )
+    }
+}
+
+async fn authorization(req: HttpRequest, data: Data<ServerData>) -> HttpResponse {
+    let mut state = data.state.lock().unwrap();
+    let base_url = base_url(&req);
+
+    let status = if !state.challenge_started {
+        "pending"
+    } else {
+        state.authorization_polls += 1;
+
+        if state.authorization_polls == 1 {
+            "pending"
+        } else if state.reject_challenge {
+            "invalid"
+        } else {
+            state.order_ready = true;
+            "valid"
         }
-    ],
-    "authorizations": [
-        "<URL>/acme/authz/YTqpYUthlVfwBncUufE8IRWLMSRqcSs"
-    ],
-    "finalize": "<URL>/acme/finalize/7738992/18234324"
-    }"#;
+    };
 
-    let url = base_url(&req);
-    let location = re_url()
-        .replace_all("<URL>/acme/order/YTqpYUthlVfwBncUufE8", url.as_str())
-        .into_owned();
+    let error = (status == "invalid").then(|| {
+        json!({
+            "type": "urn:ietf:params:acme:error:unauthorized",
+            "detail": "challenge proof was not found",
+        })
+    });
 
-    HttpResponse::Created()
-        .insert_header(("Location", location))
-        .body(re_url().replace_all(BODY, url.as_str()).into_owned())
-}
-
-async fn post_get_order(req: HttpRequest) -> HttpResponse {
-    const BODY: &str = r#"{
-    "status": "<STATUS>",
-    "expires": "2019-01-09T08:26:43.570360537Z",
-    "identifiers": [
-        {
-        "type": "dns",
-        "value": "acme-test.example.com"
-        }
-    ],
-    "authorizations": [
-        "<URL>/acme/authz/YTqpYUthlVfwBncUufE8IRWLMSRqcSs"
-    ],
-    "finalize": "<URL>/acme/finalize/7738992/18234324",
-    "certificate": "<URL>/acme/cert/fae41c070f967713109028"
-    }"#;
-
-    let url = base_url(&req);
-    let body = re_url().replace_all(BODY, url.as_str()).into_owned();
-
-    HttpResponse::Ok().body(body)
-}
-
-async fn post_authz(req: HttpRequest) -> HttpResponse {
-    const BODY: &str = r#"{
-        "identifier": {
-            "type": "dns",
-            "value": "acmetest.algesten.se"
-        },
-        "status": "pending",
-        "expires": "2019-01-09T08:26:43Z",
+    json_response(json!({
+        "identifier": {"type": "dns", "value": "example.com"},
+        "status": status,
         "challenges": [
-        {
-            "type": "http-01",
-            "status": "pending",
-            "url": "<URL>/acme/challenge/YTqpYUthlVfwBncUufE8IRWLMSRqcSs/216789597",
-            "token": "MUi-gqeOJdRkSb_YR2eaMxQBqf6al8dgt_dOttSWb0w"
-        },
-        {
-            "type": "tls-alpn-01",
-            "status": "pending",
-            "url": "<URL>/acme/challenge/YTqpYUthlVfwBncUufE8IRWLMSRqcSs/216789598",
-            "token": "WCdRWkCy4THTD_j5IH4ISAzr59lFIg5wzYmKxuOJ1lU"
-        },
-        {
-            "type": "dns-01",
-            "status": "pending",
-            "url": "<URL>/acme/challenge/YTqpYUthlVfwBncUufE8IRWLMSRqcSs/216789599",
-            "token": "RRo2ZcXAEqxKvMH8RGcATjSK1KknLEUmauwfQ5i3gG8"
-        }
-        ]
-    }"#;
-
-    let url = base_url(&req);
-    HttpResponse::Created().body(re_url().replace_all(BODY, url.as_str()).into_owned())
+            {
+                "type": "http-01",
+                "status": status,
+                "url": format!("{base_url}/challenge/1"),
+                "token": "test-token",
+                "error": error,
+            },
+            {
+                "type": "dns-01",
+                "status": status,
+                "url": format!("{base_url}/challenge/2"),
+                "token": "test-token",
+            },
+            {
+                "type": "tls-alpn-01",
+                "status": status,
+                "url": format!("{base_url}/challenge/3"),
+                "token": "test-token",
+            },
+        ],
+    }))
 }
 
-async fn post_finalize() -> HttpResponse {
+async fn challenge(req: HttpRequest, data: Data<ServerData>) -> HttpResponse {
+    data.state.lock().unwrap().challenge_started = true;
+
+    json_response(json!({
+        "type": "http-01",
+        "status": "pending",
+        "url": format!("{}/challenge/1", base_url(&req)),
+        "token": "test-token",
+    }))
+}
+
+async fn order(req: HttpRequest, data: Data<ServerData>) -> HttpResponse {
+    let mut state = data.state.lock().unwrap();
+    let base_url = base_url(&req);
+
+    let status = if state.finalized {
+        state.finalization_polls += 1;
+
+        if state.finalization_polls == 1 {
+            "processing"
+        } else if state.reject_finalization {
+            "invalid"
+        } else {
+            "valid"
+        }
+    } else if state.order_ready {
+        "ready"
+    } else {
+        "pending"
+    };
+
+    json_response(json!({
+        "status": status,
+        "identifiers": [{"type": "dns", "value": "example.com"}],
+        "authorizations": [format!("{base_url}/authorization/1")],
+        "finalize": format!("{base_url}/finalize/1"),
+        "certificate": (status == "valid" && !state.omit_certificate_url)
+            .then(|| format!("{base_url}/certificate/1")),
+    }))
+}
+
+async fn finalize(data: Data<ServerData>) -> HttpResponse {
+    data.state.lock().unwrap().finalized = true;
+
     HttpResponse::Ok().finish()
 }
 
-async fn post_certificate() -> HttpResponse {
-    HttpResponse::Ok().body("CERT HERE")
+async fn certificate(data: Data<ServerData>) -> HttpResponse {
+    HttpResponse::Ok().body(data.certificate_pem.clone())
 }
 
-/// Starts a server that returns fixed ACME directory and resource responses.
-pub fn with_directory_server() -> TestServer {
-    let server = actix_test::start(|| {
-        App::new()
-            .route("/directory", web::get().to(get_directory))
-            .route("/acme/new-nonce", web::head().to(head_new_nonce))
-            .route("/acme/new-acct", web::post().to(post_new_acct))
-            .route("/acme/new-order", web::post().to(post_new_order))
-            .route(
-                "/acme/order/YTqpYUthlVfwBncUufE8",
-                web::post().to(post_get_order),
-            )
-            .route(
-                "/acme/authz/YTqpYUthlVfwBncUufE8IRWLMSRqcSs",
-                web::post().to(post_authz),
-            )
-            .route(
-                "/acme/finalize/7738992/18234324",
-                web::post().to(post_finalize),
-            )
-            .route(
-                "/acme/cert/fae41c070f967713109028",
-                web::post().to(post_certificate),
-            )
+async fn revoke(data: Data<ServerData>) -> HttpResponse {
+    data.state.lock().unwrap().revocation_requests += 1;
+
+    HttpResponse::Ok().finish()
+}
+
+pub fn start_server(config: AcmeServerConfig) -> AcmeServer {
+    let key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).unwrap();
+    let certificate_pem = CertificateParams::new(vec!["example.com".to_owned()])
+        .unwrap()
+        .self_signed(&key)
+        .unwrap()
+        .pem();
+
+    let state = Arc::new(Mutex::new(AcmeState {
+        reject_challenge: config.reject_challenge,
+        reject_first_order_nonce: config.reject_first_order_nonce,
+        reject_unknown_account: config.reject_unknown_account,
+        reverse_order_identifiers: config.reverse_order_identifiers,
+        reject_finalization: config.reject_finalization,
+        omit_certificate_url: config.omit_certificate_url,
+        ..Default::default()
+    }));
+
+    let data = Data::new(ServerData {
+        certificate_pem,
+        state: Arc::clone(&state),
     });
 
-    TestServer {
-        dir_url: server.url("/directory"),
+    let server = actix_test::start(move || {
+        App::new()
+            .app_data(data.clone())
+            .route("/directory", web::get().to(directory))
+            .route("/nonce", web::head().to(nonce))
+            .route("/account", web::post().to(account))
+            .route("/new-order", web::post().to(new_order))
+            .route("/authorization/1", web::post().to(authorization))
+            .route("/challenge/1", web::post().to(challenge))
+            .route("/order/1", web::post().to(order))
+            .route("/finalize/1", web::post().to(finalize))
+            .route("/certificate/1", web::post().to(certificate))
+            .route("/revoke", web::post().to(revoke))
+    });
+
+    AcmeServer {
+        directory_url: server.url("/directory"),
+        state,
         _server: server,
     }
 }
@@ -213,8 +309,8 @@ pub fn with_directory_server() -> TestServer {
 mod tests {
     #[tokio::test]
     async fn test_make_directory() {
-        let server = super::with_directory_server();
-        let res = reqwest::get(&server.dir_url).await.unwrap();
+        let server = super::start_server(Default::default());
+        let res = reqwest::get(&server.directory_url).await.unwrap();
         assert!(res.status().is_success());
     }
 }

@@ -330,14 +330,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_challenges() {
-        let server = acme_test_server::with_directory_server();
-        let url = DirectoryUrl::Other(&server.dir_url);
+        let server = acme_test_server::start_server(Default::default());
+        let url = DirectoryUrl::Other(&server.directory_url);
         let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
             .register_account(Some(vec!["mailto:foo@bar.com".to_owned()]))
             .await
             .unwrap();
-        let ord = acc.new_order("acme-test.example.com", &[]).await.unwrap();
+        let ord = acc.new_order("example.com", &[]).await.unwrap();
         let authz = ord.authorizations().await.unwrap();
         assert!(authz.len() == 1);
         let auth = &authz[0];
