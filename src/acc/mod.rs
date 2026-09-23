@@ -54,9 +54,15 @@ impl Account {
         }
     }
 
-    /// Private key for this account.
+    /// Exports this account's P-256 private key as PKCS#8 PEM.
     ///
-    /// The key is an elliptic curve private key.
+    /// Store this secret securely and pass it to [`crate::Directory::load_existing_account`] to
+    /// load the account later. This is the account signing key, not a certificate's private key.
+    /// The returned string is zeroized when dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the key cannot be encoded.
     pub fn acme_private_key_pem(&self) -> eyre::Result<Zeroizing<String>> {
         self.inner.transport.acme_key().to_pem()
     }

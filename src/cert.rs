@@ -97,6 +97,15 @@ impl Certificate {
         }
     }
 
+    /// Loads a saved P-256 private key and certificate from PEM strings.
+    ///
+    /// The key must use PKCS#8 encoding. This method checks that the key and certificate can be
+    /// decoded. It does not check that they match, that the certificate is trusted, or that it is
+    /// within its validity period.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the certificate or P-256 private key cannot be decoded.
     pub fn parse(private_key_pem: Zeroizing<String>, certificate: String) -> eyre::Result<Self> {
         // validate certificate
         x509_cert::Certificate::from_pem(certificate.as_str())?;

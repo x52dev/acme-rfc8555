@@ -25,7 +25,7 @@ pub enum DirectoryUrl<'a> {
     /// certificate is not supposed to be in any trust chains.
     LetsEncryptStaging,
 
-    /// Provide an arbitrary director URL to connect to.
+    /// Provide an arbitrary directory URL to connect to.
     Other(&'a str),
 }
 
@@ -47,7 +47,11 @@ pub struct Directory {
 }
 
 impl Directory {
-    /// Create a directory over a persistence implementation and directory url.
+    /// Fetches the provider's directory and prepares a pool of request nonces.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is not a valid directory object.
     pub async fn fetch(url: DirectoryUrl<'_>) -> eyre::Result<Directory> {
         let res = req_handle_error(req_get(url.to_url()).await).await?;
         let api_directory = res.json::<api::Directory>().await?;
@@ -59,11 +63,31 @@ impl Directory {
         })
     }
 
+    /// Registers an account with a newly generated P-256 account key.
+    ///
+    /// `contact` contains contact URIs, such as `mailto:admin@example.com`. Pass `None` to omit
+    /// contact details. This request agrees to the provider's terms of service.
+    ///
+    /// Save the key from [`Account::acme_private_key_pem`] to load this account later.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails, the provider rejects registration, or the response
+    /// is missing required account data.
     pub async fn register_account(&self, contact: Option<Vec<String>>) -> eyre::Result<Account> {
         let acme_key = AcmeKey::new();
         self.upsert_account(acme_key, contact).await
     }
 
+    /// Loads an account using its P-256 PKCS#8 PEM key, or registers it if it does not exist.
+    ///
+    /// `contact` contains contact URIs for registration. This request agrees to the provider's
+    /// terms of service. Use [`Self::load_existing_account`] to avoid registering a new account.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the key cannot be decoded, the request fails, or the provider returns
+    /// an error or an invalid account response.
     pub async fn load_account(
         &self,
         private_key_pem: &str,
@@ -73,6 +97,15 @@ impl Directory {
         self.upsert_account(acme_key, contact).await
     }
 
+    /// Loads an existing account using its P-256 PKCS#8 PEM key.
+    ///
+    /// The key must identify an account at this directory's provider. This method does not
+    /// register an account or send agreement to the terms of service.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the key cannot be decoded, no account exists for the key, the request
+    /// fails, or the response is missing required account data.
     pub async fn load_existing_account(&self, private_key_pem: &str) -> eyre::Result<Account> {
         let acme_key = AcmeKey::from_pem(private_key_pem)?;
 
