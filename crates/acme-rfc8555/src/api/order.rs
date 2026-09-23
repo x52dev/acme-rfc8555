@@ -113,3 +113,48 @@ impl Order {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn overwrite_preserves_requested_domain_order() {
+        let first = api::Identifier::dns("example.com");
+        let second = api::Identifier::dns("www.example.com");
+        let mut order = Order::from_identifiers(vec![first.clone(), second.clone()]);
+        let refreshed = Order {
+            status: Some(OrderStatus::Ready),
+            identifiers: vec![second, first],
+            ..Default::default()
+        };
+
+        order.overwrite(refreshed).unwrap();
+
+        assert_eq!(order.domains(), ["example.com", "www.example.com"]);
+        assert_eq!(order.status, Some(OrderStatus::Ready));
+    }
+
+    #[test]
+    fn overwrite_rejects_changed_domains_without_mutating_order() {
+        let mut order = Order::from_identifiers(vec![api::Identifier::dns("example.com")]);
+        let original = order.clone();
+        let refreshed = Order::from_identifiers(vec![api::Identifier::dns("other.example.com")]);
+
+        assert!(order.overwrite(refreshed).is_err());
+        assert_eq!(order, original);
+    }
+
+    #[test]
+    fn overwrite_rejects_missing_domains_without_mutating_order() {
+        let mut order = Order::from_identifiers(vec![
+            api::Identifier::dns("example.com"),
+            api::Identifier::dns("www.example.com"),
+        ]);
+        let original = order.clone();
+        let refreshed = Order::from_identifiers(vec![api::Identifier::dns("example.com")]);
+
+        assert!(order.overwrite(refreshed).is_err());
+        assert_eq!(order, original);
+    }
+}

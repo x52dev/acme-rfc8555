@@ -216,3 +216,65 @@ fn jws_with<T: Serialize + ?Sized>(
 
     Ok(serde_json::to_string(&jws)?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn post_as_get_has_an_empty_jws_payload() {
+        let key = AcmeKey::new();
+        let header = JwsProtectedHeader::new_kid(
+            "https://example.com/account/1",
+            "https://example.com/order/1",
+            "nonce".to_owned(),
+        );
+
+        let jws = jws_with(header, &key, &crate::api::EmptyString).unwrap();
+        let jws = serde_json::from_str::<serde_json::Value>(&jws).unwrap();
+
+        assert_eq!(jws["payload"], "");
+    }
+
+    #[test]
+    fn jws_encodes_a_json_payload() {
+        let key = AcmeKey::new();
+        let header = JwsProtectedHeader::new_kid(
+            "https://example.com/account/1",
+            "https://example.com/order/1",
+            "nonce".to_owned(),
+        );
+
+        let jws = jws_with(header, &key, &crate::api::EmptyObject).unwrap();
+        let jws = serde_json::from_str::<serde_json::Value>(&jws).unwrap();
+
+        assert_eq!(jws["payload"], BASE64_URL_SAFE_NO_PAD.encode("{}"));
+    }
+
+    #[test]
+    fn account_jws_header_uses_jwk_without_kid() {
+        let key = AcmeKey::new();
+        let jwk = Jwk::try_from(&key).unwrap();
+        let header =
+            JwsProtectedHeader::new_jwk(jwk, "https://example.com/new-account", "nonce".to_owned());
+
+        let header = serde_json::to_value(header).unwrap();
+
+        assert!(header.get("jwk").is_some());
+        assert!(header.get("kid").is_none());
+    }
+
+    #[test]
+    fn existing_account_jws_header_uses_kid_without_jwk() {
+        let header = JwsProtectedHeader::new_kid(
+            "https://example.com/account/1",
+            "https://example.com/order/1",
+            "nonce".to_owned(),
+        );
+
+        let header = serde_json::to_value(header).unwrap();
+
+        assert_eq!(header["kid"], "https://example.com/account/1");
+        assert!(header.get("jwk").is_none());
+    }
+}
