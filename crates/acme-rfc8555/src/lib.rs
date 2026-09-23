@@ -96,8 +96,6 @@
 //! [`authorizations`]: crate::order::NewOrder::authorizations()
 //! [rate limits]: https://letsencrypt.org/docs/rate-limits
 
-#![deny(rust_2018_idioms, nonstandard_style, future_incompatible)]
-
 mod acc;
 mod cert;
 mod dir;
@@ -108,9 +106,6 @@ mod trans;
 
 pub mod api;
 pub mod order;
-
-#[cfg(test)]
-mod test;
 
 pub use crate::{
     acc::{Account, RevocationReason},

@@ -10,7 +10,7 @@ authors = [
 categories = ["web-programming", "api-bindings"]
 keywords = ["acme", "certificate", "tls", "letsencrypt", "lets-encrypt"]
 repository = "https://github.com/x52dev/acme-rfc8555"
-edition = "2021"
+edition.workspace = true
 rust-version.workspace = true
 license-file.workspace = true
 readme.workspace = true
@@ -60,8 +60,8 @@ x509-cert = { version = "0.3", features = ["pem", "builder"] }
 zeroize = "1"
 
 [dev-dependencies]
+acme-test-server = { path = "../acme-test-server" }
 actix-files = "0.6"
-actix-test = "0.1"
 actix-web = { version = "4", default-features = false }
 color-eyre = "0.6"
 env_logger = "0.11"
@@ -71,3 +71,6 @@ regex = "1.4"
 rustls = "0.23"
 rustls-webpki = "0.103"
 tokio = { version = "1.38.2", features = ["full"] }
+
+[lints]
+workspace = true

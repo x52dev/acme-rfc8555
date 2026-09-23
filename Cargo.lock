@@ -6,8 +6,8 @@ version = 4
 name = "acme-rfc8555"
 version = "0.4.1"
 dependencies = [
+ "acme-test-server",
  "actix-files",
- "actix-test",
  "actix-web",
  "base64 0.23.1",
  "color-eyre",
@@ -35,6 +35,17 @@ dependencies = [
  "tokio",
  "x509-cert",
  "zeroize",
+]
+
+[[package]]
+name = "acme-test-server"
+version = "0.1.0"
+dependencies = [
+ "actix-test",
+ "actix-web",
+ "regex",
+ "reqwest",
+ "tokio",
 ]
 
 [[package]]

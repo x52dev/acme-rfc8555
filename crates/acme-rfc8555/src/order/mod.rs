@@ -311,7 +311,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_authorizations() {
-        let server = crate::test::with_directory_server();
+        let server = acme_test_server::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
@@ -324,7 +324,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_finalize() {
-        let server = crate::test::with_directory_server();
+        let server = acme_test_server::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
@@ -343,7 +343,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_download_and_save_cert() {
-        let server = crate::test::with_directory_server();
+        let server = acme_test_server::with_directory_server();
         let url = DirectoryUrl::Other(&server.dir_url);
         let dir = Directory::fetch(url).await.unwrap();
         let acc = dir
