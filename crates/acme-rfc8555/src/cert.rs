@@ -187,3 +187,28 @@ impl Certificate {
         Ok(diff.whole_days())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn certificate_chain_keeps_certificate_order() {
+        let first =
+            rcgen::generate_simple_self_signed(vec!["first.example.com".to_owned()]).unwrap();
+        let second =
+            rcgen::generate_simple_self_signed(vec!["second.example.com".to_owned()]).unwrap();
+        let pem = format!("{}{}", first.cert.pem(), second.cert.pem());
+        let key = create_p256_key().to_pkcs8_pem().unwrap();
+
+        let certificate = Certificate::new(key, pem);
+
+        assert_eq!(
+            certificate.certificate_chain().unwrap(),
+            vec![
+                first.cert.der().as_ref().to_vec(),
+                second.cert.der().as_ref().to_vec(),
+            ]
+        );
+    }
+}

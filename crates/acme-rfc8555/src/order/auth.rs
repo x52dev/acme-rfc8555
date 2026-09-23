@@ -326,7 +326,35 @@ async fn poll_authorization_result(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::*;
+
+    async fn pending_auth() -> Auth {
+        let server = acme_test_server::with_directory_server();
+        let directory = Directory::fetch(DirectoryUrl::Other(&server.dir_url))
+            .await
+            .unwrap();
+        let account = directory.register_account(None).await.unwrap();
+        let order = account
+            .new_order("acme-test.example.com", &[])
+            .await
+            .unwrap();
+
+        order.authorizations().await.unwrap().remove(0)
+    }
+
+    fn expected_key_authorization(auth: &Auth, token: &str) -> String {
+        let key = auth.inner.transport.acme_key();
+        let point = key.private_key().verifying_key().to_sec1_point(false);
+        let jwk_json = format!(
+            r#"{{"crv":"P-256","kty":"EC","x":"{}","y":"{}"}}"#,
+            BASE64_URL_SAFE_NO_PAD.encode(point.x().unwrap()),
+            BASE64_URL_SAFE_NO_PAD.encode(point.y().unwrap()),
+        );
+        let thumbprint = BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(jwk_json));
+
+        format!("{token}.{thumbprint}")
+    }
 
     #[tokio::test]
     async fn test_get_challenges() {
@@ -347,5 +375,51 @@ mod tests {
 
         let dns = auth.dns_challenge().unwrap();
         assert!(dns.need_validate());
+    }
+
+    #[tokio::test]
+    async fn http_proof_matches_key_authorization() {
+        let auth = pending_auth().await;
+        let challenge = auth.http_challenge().unwrap();
+        let expected = expected_key_authorization(&auth, challenge.http_token());
+
+        assert_eq!(challenge.http_proof().unwrap(), expected);
+    }
+
+    #[tokio::test]
+    async fn dns_proof_matches_key_authorization_digest() {
+        let auth = pending_auth().await;
+        let challenge = auth.dns_challenge().unwrap();
+        let authorization = expected_key_authorization(&auth, &challenge.api_challenge().token);
+        let expected = BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(authorization));
+
+        assert_eq!(challenge.dns_proof().unwrap(), expected);
+    }
+
+    #[tokio::test]
+    async fn tls_alpn_proof_hashes_the_key_authorization() {
+        let auth = pending_auth().await;
+        let challenge = auth.tls_alpn_challenge().unwrap();
+        let authorization = expected_key_authorization(&auth, &challenge.api_challenge().token);
+        let digest: [u8; 32] = Sha256::digest(authorization).into();
+
+        assert_eq!(challenge.tls_alpn_proof().unwrap(), digest);
+    }
+
+    #[tokio::test]
+    async fn valid_authorization_needs_no_challenge() {
+        let mut auth = pending_auth().await;
+        auth.api_auth.status = api::AuthorizationStatus::Valid;
+
+        assert!(!auth.need_challenge());
+    }
+
+    #[tokio::test]
+    async fn validated_challenge_needs_no_validation() {
+        let auth = pending_auth().await;
+        let mut challenge = auth.http_challenge().unwrap();
+        challenge.api_challenge.status = api::ChallengeStatus::Valid;
+
+        assert!(!challenge.need_validate());
     }
 }

@@ -309,6 +309,49 @@ mod tests {
     use super::*;
     use crate::{cert, Directory, DirectoryUrl};
 
+    async fn pending_order() -> (acme_test_server::TestServer, NewOrder) {
+        let server = acme_test_server::with_directory_server();
+        let directory = Directory::fetch(DirectoryUrl::Other(&server.dir_url))
+            .await
+            .unwrap();
+        let account = directory.register_account(None).await.unwrap();
+        let order = account
+            .new_order("acme-test.example.com", &[])
+            .await
+            .unwrap();
+
+        (server, order)
+    }
+
+    #[tokio::test]
+    async fn pending_order_cannot_confirm_validations() {
+        let (_server, order) = pending_order().await;
+
+        assert!(!order.is_validated());
+        assert!(order.confirm_validations().is_none());
+    }
+
+    #[tokio::test]
+    async fn refreshed_ready_order_can_confirm_validations() {
+        let (_server, mut order) = pending_order().await;
+
+        order.refresh().await.unwrap();
+
+        assert!(order.is_validated());
+        assert_eq!(
+            order.confirm_validations().unwrap().api_order().status,
+            Some(api::OrderStatus::Ready)
+        );
+    }
+
+    #[tokio::test]
+    async fn valid_order_can_confirm_validations() {
+        let (_server, mut order) = pending_order().await;
+        order.order.api_order.status = Some(api::OrderStatus::Valid);
+
+        assert!(order.confirm_validations().is_some());
+    }
+
     #[tokio::test]
     async fn test_get_authorizations() {
         let server = acme_test_server::with_directory_server();
