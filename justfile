@@ -52,7 +52,7 @@ test-msrv:
 
 # Test workspace and generate Codecov coverage file
 test-coverage-codecov:
-    cargo {{ toolchain }} llvm-cov --workspace --all-features --codecov --output-path codecov.json
+    cargo {{ toolchain }} llvm-cov nextest --workspace --all-features --codecov --output-path codecov.json
 
 # Test workspace and generate LCOV coverage file
 test-coverage-lcov:
