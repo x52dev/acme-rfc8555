@@ -7,7 +7,7 @@ const ACCOUNTS_DIR: &str = "./acme-accounts";
 
 const CONTACT_EMAIL: Option<&str> = None;
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
