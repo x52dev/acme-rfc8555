@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Handle missing or invalid response `Content-Type` headers without panicking, and recognize `application/problem+json` with parameters.
+
 ## 0.4.1
 
 - No significant changes since `0.4.0`.

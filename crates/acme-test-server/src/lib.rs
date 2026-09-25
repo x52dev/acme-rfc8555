@@ -244,6 +244,35 @@ pub fn with_directory_server() -> TestServer {
     let server = actix_test::start(move || {
         App::new()
             .app_data(validation_polls.clone())
+            .route(
+                "/error/{kind}",
+                web::get().to(|kind: web::Path<String>| async move {
+                    let mut response = HttpResponse::BadRequest();
+
+                    match kind.as_str() {
+                        "parameterized" => {
+                            response.insert_header((
+                                "Content-Type",
+                                "Application/Problem+Json; charset=utf-8",
+                            ));
+                        }
+                        "malformed" => {
+                            response.insert_header(("Content-Type", "invalid"));
+                        }
+                        "non-ascii" => {
+                            response.insert_header((
+                                "Content-Type",
+                                actix_web::http::header::HeaderValue::from_bytes(b"\xff").unwrap(),
+                            ));
+                        }
+                        _ => {}
+                    }
+
+                    response.body(web::Bytes::from_static(
+                        br#"{"type":"badNonce","detail":"nonce expired"}"#,
+                    ))
+                }),
+            )
             .route("/directory", web::get().to(get_directory))
             .route("/acme/new-nonce", web::head().to(head_new_nonce))
             .route("/acme/new-acct", web::post().to(post_new_acct))

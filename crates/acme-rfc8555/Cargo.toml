@@ -44,6 +44,7 @@ der = { version = "0.8", features = ["std", "time"] }
 ecdsa = { version = "0.17", features = ["algorithm"] }
 eyre = "0.6"
 log = "0.4"
+mediatype = "0.23"
 p256 = { version = "0.14", features = ["pkcs8", "ecdsa-core"] }
 parking_lot = "0.12"
 pem = { package = "pem-rfc7468", version = "1" }
