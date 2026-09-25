@@ -154,8 +154,14 @@ mod tests {
         assert_eq!(problem._type, "httpReqError");
 
         let detail = problem.detail.unwrap();
-        assert!(detail.contains("400"), "{detail}");
-        assert!(detail.contains("nonce expired"), "{detail}");
+        assert!(
+            detail.contains("400"),
+            "expected HTTP status 400 in error detail: {detail}"
+        );
+        assert!(
+            detail.contains("nonce expired"),
+            "expected response body in error detail: {detail}"
+        );
     }
 
     #[tokio::test]
@@ -168,8 +174,14 @@ mod tests {
         assert_eq!(problem._type, "httpReqError");
 
         let detail = problem.detail.unwrap();
-        assert!(detail.contains("400"), "{detail}");
-        assert!(detail.contains("nonce expired"), "{detail}");
+        assert!(
+            detail.contains("400"),
+            "expected HTTP status 400 in error detail: {detail}"
+        );
+        assert!(
+            detail.contains("nonce expired"),
+            "expected response body in error detail: {detail}"
+        );
     }
 
     #[tokio::test]
@@ -182,8 +194,14 @@ mod tests {
         assert_eq!(problem._type, "httpReqError");
 
         let detail = problem.detail.unwrap();
-        assert!(detail.contains("400"), "{detail}");
-        assert!(detail.contains("nonce expired"), "{detail}");
+        assert!(
+            detail.contains("400"),
+            "expected HTTP status 400 in error detail: {detail}"
+        );
+        assert!(
+            detail.contains("nonce expired"),
+            "expected response body in error detail: {detail}"
+        );
     }
 
     #[tokio::test]
