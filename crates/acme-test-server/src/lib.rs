@@ -2,7 +2,10 @@
 
 #![allow(clippy::trivial_regex)]
 
-use std::sync::OnceLock;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    OnceLock,
+};
 
 use actix_web::{web, App, HttpRequest, HttpResponse};
 use regex::Regex;
@@ -18,6 +21,13 @@ pub struct TestServer {
     /// The URL of the ACME directory endpoint.
     pub dir_url: String,
     _server: actix_test::TestServer,
+}
+
+impl TestServer {
+    /// Returns the URL for a path on this test server.
+    pub fn url(&self, path: &str) -> String {
+        self._server.url(path)
+    }
 }
 
 fn base_url(req: &HttpRequest) -> String {
@@ -177,10 +187,63 @@ async fn post_certificate() -> HttpResponse {
     HttpResponse::Ok().body("CERT HERE")
 }
 
+async fn get_problem() -> HttpResponse {
+    HttpResponse::BadRequest()
+        .insert_header(("content-type", "application/problem+json"))
+        .body(r#"{"type":"badNonce","detail":"nonce expired"}"#)
+}
+
+async fn get_malformed_problem() -> HttpResponse {
+    HttpResponse::BadRequest()
+        .insert_header(("content-type", "application/problem+json"))
+        .body("not json")
+}
+
+async fn get_plain_error() -> HttpResponse {
+    HttpResponse::BadRequest()
+        .insert_header(("content-type", "text/plain"))
+        .body("upstream failure")
+}
+
+async fn post_validation_challenge() -> HttpResponse {
+    HttpResponse::Ok().body(
+        r#"{"type":"http-01","status":"processing","url":"https://example.com/challenge","token":"token"}"#,
+    )
+}
+
+fn validation_authorization(status: &str, challenges: &str) -> HttpResponse {
+    HttpResponse::Ok().body(format!(
+        r#"{{"identifier":{{"type":"dns","value":"acme-test.example.com"}},"status":"{status}","challenges":{challenges}}}"#
+    ))
+}
+
+async fn post_validation_pending_then_valid(polls: web::Data<AtomicUsize>) -> HttpResponse {
+    let status = if polls.fetch_add(1, Ordering::Relaxed) == 0 {
+        "pending"
+    } else {
+        "valid"
+    };
+
+    validation_authorization(status, "[]")
+}
+
+async fn post_validation_invalid_error() -> HttpResponse {
+    validation_authorization(
+        "invalid",
+        r#"[{"type":"dns-01","status":"invalid","url":"https://example.com/challenge","token":"token","error":{"type":"urn:ietf:params:acme:error:dns","detail":"DNS lookup failed"}}]"#,
+    )
+}
+
+async fn post_validation_invalid_no_error() -> HttpResponse {
+    validation_authorization("invalid", "[]")
+}
+
 /// Starts a server that returns fixed ACME directory and resource responses.
 pub fn with_directory_server() -> TestServer {
-    let server = actix_test::start(|| {
+    let validation_polls = web::Data::new(AtomicUsize::new(0));
+    let server = actix_test::start(move || {
         App::new()
+            .app_data(validation_polls.clone())
             .route("/directory", web::get().to(get_directory))
             .route("/acme/new-nonce", web::head().to(head_new_nonce))
             .route("/acme/new-acct", web::post().to(post_new_acct))
@@ -200,6 +263,28 @@ pub fn with_directory_server() -> TestServer {
             .route(
                 "/acme/cert/fae41c070f967713109028",
                 web::post().to(post_certificate),
+            )
+            .route("/test/problem", web::get().to(get_problem))
+            .route(
+                "/test/malformed-problem",
+                web::get().to(get_malformed_problem),
+            )
+            .route("/test/plain-error", web::get().to(get_plain_error))
+            .route(
+                "/test/validation/challenge",
+                web::post().to(post_validation_challenge),
+            )
+            .route(
+                "/test/validation/pending-then-valid",
+                web::post().to(post_validation_pending_then_valid),
+            )
+            .route(
+                "/test/validation/invalid-error",
+                web::post().to(post_validation_invalid_error),
+            )
+            .route(
+                "/test/validation/invalid-no-error",
+                web::post().to(post_validation_invalid_no_error),
             )
     });
 

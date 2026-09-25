@@ -79,3 +79,59 @@ pub(crate) fn req_expect_header(res: &reqwest::Response, name: &str) -> ReqResul
             subproblems: None,
         })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn parses_json_problem_response() {
+        let server = acme_test_server::with_directory_server();
+        let response = req_get(&server.url("/test/problem")).await;
+
+        let problem = req_handle_error(response).await.unwrap_err();
+
+        assert_eq!(
+            problem,
+            Problem {
+                _type: "badNonce".to_owned(),
+                detail: Some("nonce expired".to_owned()),
+                subproblems: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn malformed_json_problem_keeps_the_response_body() {
+        let server = acme_test_server::with_directory_server();
+        let response = req_get(&server.url("/test/malformed-problem")).await;
+
+        let problem = req_handle_error(response).await.unwrap_err();
+
+        assert_eq!(problem._type, "problemJsonFail");
+        assert!(problem.detail.unwrap().contains("body: not json"));
+    }
+
+    #[tokio::test]
+    async fn plain_http_error_keeps_status_and_body() {
+        let server = acme_test_server::with_directory_server();
+        let response = req_get(&server.url("/test/plain-error")).await;
+
+        let problem = req_handle_error(response).await.unwrap_err();
+
+        assert_eq!(problem._type, "httpReqError");
+        let detail = problem.detail.unwrap();
+        assert!(detail.contains("400"));
+        assert!(detail.contains("upstream failure"));
+    }
+
+    #[tokio::test]
+    async fn missing_response_header_returns_problem() {
+        let server = acme_test_server::with_directory_server();
+        let response = req_get(&server.dir_url).await;
+
+        let problem = req_expect_header(&response, "location").unwrap_err();
+
+        assert_eq!(problem._type, "Missing header: location");
+    }
+}
