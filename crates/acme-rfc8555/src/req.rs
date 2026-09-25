@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use mediatype::{names, MediaType};
+
 use crate::api::Problem;
 
 pub(crate) type ReqResult<T> = std::result::Result<T, Problem>;
@@ -45,8 +47,11 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
         .headers()
         .get("content-type")
         .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<mime::Mime>().ok())
-        .is_some_and(|media_type| media_type.essence_str() == "application/problem+json");
+        .and_then(|value| MediaType::parse(value).ok())
+        .is_some_and(|media_type| {
+            media_type.essence()
+                == MediaType::from_parts(names::APPLICATION, names::PROBLEM, Some(names::JSON), &[])
+        });
 
     let problem = if is_problem {
         // if we were sent a problem+json, deserialize it
