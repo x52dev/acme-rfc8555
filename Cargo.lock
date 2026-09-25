@@ -17,6 +17,7 @@ dependencies = [
  "error_reporter",
  "eyre",
  "log",
+ "mime",
  "p256",
  "parking_lot",
  "pem-rfc7468",

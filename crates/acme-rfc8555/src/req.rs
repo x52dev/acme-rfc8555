@@ -41,7 +41,14 @@ pub(crate) async fn req_handle_error(res: reqwest::Response) -> ReqResult<reqwes
         return Ok(res);
     }
 
-    let problem = if res.headers().get("content-type").unwrap() == "application/problem+json" {
+    let is_problem = res
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<mime::Mime>().ok())
+        .is_some_and(|media_type| media_type.essence_str() == "application/problem+json");
+
+    let problem = if is_problem {
         // if we were sent a problem+json, deserialize it
         let body = res.text().await.unwrap();
 
@@ -133,5 +140,60 @@ mod tests {
         let problem = req_expect_header(&response, "location").unwrap_err();
 
         assert_eq!(problem._type, "Missing header: location");
+    }
+
+    #[tokio::test]
+    async fn missing_content_type_returns_http_error() {
+        let server = acme_test_server::with_directory_server();
+        let response = req_get(&server.url("/error/missing")).await;
+
+        assert!(!response.headers().contains_key("content-type"));
+
+        let problem = req_handle_error(response).await.unwrap_err();
+
+        assert_eq!(problem._type, "httpReqError");
+
+        let detail = problem.detail.unwrap();
+        assert!(detail.contains("400"), "{detail}");
+        assert!(detail.contains("nonce expired"), "{detail}");
+    }
+
+    #[tokio::test]
+    async fn malformed_content_type_returns_http_error() {
+        let server = acme_test_server::with_directory_server();
+        let response = req_get(&server.url("/error/malformed")).await;
+
+        let problem = req_handle_error(response).await.unwrap_err();
+
+        assert_eq!(problem._type, "httpReqError");
+
+        let detail = problem.detail.unwrap();
+        assert!(detail.contains("400"), "{detail}");
+        assert!(detail.contains("nonce expired"), "{detail}");
+    }
+
+    #[tokio::test]
+    async fn non_ascii_content_type_returns_http_error() {
+        let server = acme_test_server::with_directory_server();
+        let response = req_get(&server.url("/error/non-ascii")).await;
+
+        let problem = req_handle_error(response).await.unwrap_err();
+
+        assert_eq!(problem._type, "httpReqError");
+
+        let detail = problem.detail.unwrap();
+        assert!(detail.contains("400"), "{detail}");
+        assert!(detail.contains("nonce expired"), "{detail}");
+    }
+
+    #[tokio::test]
+    async fn parameterized_content_type_parses_json_problem() {
+        let server = acme_test_server::with_directory_server();
+        let response = req_get(&server.url("/error/parameterized")).await;
+
+        let problem = req_handle_error(response).await.unwrap_err();
+
+        assert_eq!(problem._type, "badNonce");
+        assert_eq!(problem.detail.as_deref(), Some("nonce expired"));
     }
 }
