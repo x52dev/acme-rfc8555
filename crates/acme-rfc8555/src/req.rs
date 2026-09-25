@@ -156,11 +156,11 @@ mod tests {
         let detail = problem.detail.unwrap();
         assert!(
             detail.contains("400"),
-            "error detail should contain HTTP status 400: {detail}"
+            "error detail should contain '400': {detail}"
         );
         assert!(
             detail.contains("nonce expired"),
-            "error detail should contain the response body: {detail}"
+            "error detail should contain 'nonce expired': {detail}"
         );
     }
 
@@ -176,11 +176,11 @@ mod tests {
         let detail = problem.detail.unwrap();
         assert!(
             detail.contains("400"),
-            "error detail should contain HTTP status 400: {detail}"
+            "error detail should contain '400': {detail}"
         );
         assert!(
             detail.contains("nonce expired"),
-            "error detail should contain the response body: {detail}"
+            "error detail should contain 'nonce expired': {detail}"
         );
     }
 
@@ -196,11 +196,11 @@ mod tests {
         let detail = problem.detail.unwrap();
         assert!(
             detail.contains("400"),
-            "error detail should contain HTTP status 400: {detail}"
+            "error detail should contain '400': {detail}"
         );
         assert!(
             detail.contains("nonce expired"),
-            "error detail should contain the response body: {detail}"
+            "error detail should contain 'nonce expired': {detail}"
         );
     }
 
