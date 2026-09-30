@@ -12,6 +12,7 @@
 [![codecov](https://codecov.io/gh/x52dev/acme-rfc8555/branch/main/graph/badge.svg)](https://codecov.io/gh/x52dev/acme-rfc8555)
 [![dependency status](https://deps.rs/crate/acme-rfc8555/0.4.1/status.svg)](https://deps.rs/crate/acme-rfc8555/0.4.1)
 [![Download](https://img.shields.io/crates/d/acme-rfc8555.svg)](https://crates.io/crates/acme-rfc8555)
+[![Discord: Join chat](https://img.shields.io/badge/Discord-Join%20chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/8FAZxYFTjx)
 
 <!-- prettier-ignore-end -->
 
