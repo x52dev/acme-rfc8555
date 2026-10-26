@@ -66,11 +66,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791501778,
-        "narHash": "sha256-2HLxyAtbHUiTuVx4KCC4SIRZdcgnfpIjfOtjWULRN8o=",
+        "lastModified": 1792012538,
+        "narHash": "sha256-O9bP58JOHC5e6nZyOGS6USL5zqbHgUb5q1p+cNLT6XA=",
         "owner": "x52dev",
         "repo": "nix",
-        "rev": "cb0c45f9c706bd8b3f65dabb6a4e860d7afded8e",
+        "rev": "adef4339d4f97a2d94297d651cb6989b6e3bd0e8",
         "type": "github"
       },
       "original": {
