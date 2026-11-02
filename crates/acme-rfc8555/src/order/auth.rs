@@ -11,20 +11,22 @@ use crate::{
 
 /// An authorization ([ownership proof]) for a domain name.
 ///
-/// Each authorization for an order much be progressed to a valid state before the ACME API
-/// will issue a certificate.
+/// Each authorization for an order must reach a valid state before the ACME API will issue a
+/// certificate.
 ///
-/// Authorizations may or may not be required depending on previous orders against the same
-/// ACME account. The ACME API decides if the authorization is needed.
+/// Authorizations may or may not be required depending on previous orders against the same ACME
+/// account. The ACME API decides if the authorization is needed.
 ///
-/// Currently there are two ways of providing the authorization.
+/// This library supports three challenge methods. Use a method offered by the ACME API:
 ///
 /// * In a text file served using [HTTP] from a web server of the domain being authorized.
 /// * A `TXT` [DNS] record under the domain being authorized.
+/// * A certificate served by a [TLS-ALPN] server for the domain being authorized.
 ///
 /// [ownership proof]: ../index.html#domain-ownership
-/// [HTTP]: #method.http_challenge
-/// [DNS]: #method.dns_challenge
+/// [HTTP]: Self::http_challenge
+/// [DNS]: Self::dns_challenge
+/// [TLS-ALPN]: Self::tls_alpn_challenge
 #[derive(Debug)]
 pub struct Auth {
     inner: Arc<AccountInner>,
