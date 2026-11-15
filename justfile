@@ -65,3 +65,7 @@ doc *args:
 # Document workspace and watch for changes
 doc-watch: (doc "--open")
     cargo watch -- just doc
+
+# Check security advisories.
+check-advisories:
+    cargo deny --log-level warn --workspace --all-features check advisories

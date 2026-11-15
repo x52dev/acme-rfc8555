@@ -27,6 +27,7 @@
           devShells.default = pkgs.mkShell {
             packages = [
               config.formatter
+              pkgs.cargo-deny
               pkgs.cargo-shear
               pkgs.fd
               pkgs.just
