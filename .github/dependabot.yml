@@ -20,6 +20,6 @@ updates:
     cooldown:
       default-days: 7
     groups:
-      all:
+      all-flake-inputs:
         patterns:
           - "*"
