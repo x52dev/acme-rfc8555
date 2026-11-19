@@ -116,10 +116,10 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
 
-      - name: Install cargo-deny,just
+      - name: Install cargo-deny
         uses: taiki-e/install-action@v2.89.1
         with:
-          tool: cargo-deny,just
+          tool: cargo-deny
 
       - name: Audit check
-        run: just
+        run: cargo deny --log-level warn --workspace --all-features check advisories

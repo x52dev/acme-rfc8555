@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use acme::{create_p256_key, Directory, DirectoryUrl};
+use acme::{Directory, DirectoryUrl, create_p256_key};
 use actix_files::Files;
-use actix_web::{middleware::Logger, App, HttpServer};
+use actix_web::{App, HttpServer, middleware::Logger};
 use tokio::fs;
 
 const CHALLENGE_DIR: &str = "./acme-challenges";

@@ -1,17 +1,17 @@
 use std::io::{BufReader, Cursor};
 
 use der::{
+    Decode as _, DecodePem as _,
     asn1::Ia5String,
     time::{OffsetDateTime, PrimitiveDateTime},
-    Decode as _, DecodePem as _,
 };
-use eyre::{eyre, WrapErr as _};
+use eyre::{WrapErr as _, eyre};
 use p256::elliptic_curve::Generate as _;
 use pkcs8::{DecodePrivateKey, EncodePrivateKey};
-use rustls_pki_types::{pem::SectionKind, CertificateDer};
+use rustls_pki_types::{CertificateDer, pem::SectionKind};
 use x509_cert::{
     builder::Builder,
-    ext::pkix::{name::GeneralName, SubjectAltName},
+    ext::pkix::{SubjectAltName, name::GeneralName},
     name::Name,
     request::RequestBuilder as CsrBuilder,
 };

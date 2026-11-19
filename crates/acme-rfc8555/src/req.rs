@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use mediatype::{names, MediaType};
+use mediatype::{MediaType, names};
 
 use crate::api::Problem;
 

@@ -109,6 +109,6 @@ pub mod order;
 
 pub use crate::{
     acc::{Account, RevocationReason},
-    cert::{create_p256_key, Certificate, PrivateKey},
+    cert::{Certificate, PrivateKey, create_p256_key},
     dir::{Directory, DirectoryUrl},
 };

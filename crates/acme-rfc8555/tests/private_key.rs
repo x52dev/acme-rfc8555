@@ -1,4 +1,4 @@
-use acme::{create_p256_key, PrivateKey};
+use acme::{PrivateKey, create_p256_key};
 
 #[test]
 fn private_key_pem_round_trip() {

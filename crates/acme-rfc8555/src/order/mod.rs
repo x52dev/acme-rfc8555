@@ -20,7 +20,7 @@ use pkcs8::EncodePrivateKey as _;
 use crate::{
     acc::AccountInner,
     api,
-    cert::{create_csr, Certificate},
+    cert::{Certificate, create_csr},
 };
 
 mod auth;
@@ -307,7 +307,7 @@ impl CertOrder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{cert, Directory, DirectoryUrl};
+    use crate::{Directory, DirectoryUrl, cert};
 
     async fn pending_order() -> (acme_test_server::TestServer, NewOrder) {
         let server = acme_test_server::with_directory_server();
