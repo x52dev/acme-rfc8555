@@ -8,20 +8,20 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'nicknovitski/nix-develop@v1.2.1'
         - 'nixbuild/nix-quick-install-action@v35'
-        - 'taiki-e/install-action@v2.89.1'
+        - 'taiki-e/install-action@v2.90.3'
     '.github/workflows/coverage.yml':
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'actions/checkout@v7.0.1'
         - 'codecov/codecov-action@v7.1.0'
         - 'nicknovitski/nix-develop@v1.2.1'
         - 'nixbuild/nix-quick-install-action@v35'
-        - 'taiki-e/install-action@v2.89.1'
+        - 'taiki-e/install-action@v2.90.3'
     '.github/workflows/lint.yml':
         - 'actions-rust-lang/rustfmt@v1.1.2'
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'actions/checkout@v7.0.1'
         - 'giraffate/clippy-action@v1.0.1'
-        - 'taiki-e/install-action@v2.89.1'
+        - 'taiki-e/install-action@v2.90.3'
         - 'x52dev/actions@8dc0274800321d780097bc9b3b1ffa9f8dfb1e8b'
         - 'zizmorcore/zizmor-action@v0.8.1'
     '.github/workflows/release.yml':
@@ -139,9 +139,9 @@ dependencies:
         commit: 'sha1-1919c4a95903d2c33e4a221102edca87309fc14b'
         owner_id: 43724913
         repo_id: 442947557
-    'taiki-e/install-action@v2.89.1':
-        ref: 'v2.89.1'
-        commit: 'sha1-682ce6c3c696a4cd5168a05f98e51aa02b877941'
+    'taiki-e/install-action@v2.90.3':
+        ref: 'v2.90.3'
+        commit: 'sha1-cfdb7ed4ccc7c7dce37759eae89dc5674b469b39'
         owner_id: 43724913
         repo_id: 442947557
     'x52dev/actions@8dc0274800321d780097bc9b3b1ffa9f8dfb1e8b':
