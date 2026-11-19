@@ -1,4 +1,4 @@
-use acme::{create_p256_key, Certificate};
+use acme::{Certificate, create_p256_key};
 use zeroize::Zeroizing;
 
 fn certificate_pem() -> String {

@@ -37,10 +37,12 @@ async fn load_existing_account_rejects_invalid_pem() {
         .await
         .unwrap();
 
-    assert!(directory
-        .load_existing_account("not a private key")
-        .await
-        .is_err());
+    assert!(
+        directory
+            .load_existing_account("not a private key")
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]

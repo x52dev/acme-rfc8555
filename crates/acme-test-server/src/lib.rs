@@ -3,11 +3,11 @@
 #![allow(clippy::trivial_regex)]
 
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     OnceLock,
+    atomic::{AtomicUsize, Ordering},
 };
 
-use actix_web::{web, App, HttpRequest, HttpResponse};
+use actix_web::{App, HttpRequest, HttpResponse, web};
 use regex::Regex;
 
 static RE_URL: OnceLock<Regex> = OnceLock::new();

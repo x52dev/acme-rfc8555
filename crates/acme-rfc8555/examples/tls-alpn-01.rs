@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 
-use acme::{create_p256_key, Directory, DirectoryUrl};
-use eyre::{eyre, WrapErr as _};
+use acme::{Directory, DirectoryUrl, create_p256_key};
+use eyre::{WrapErr as _, eyre};
 use parking_lot::Mutex;
 use rustls::{
     pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer},
@@ -243,7 +243,7 @@ fn verify_keys_match(certified_key: &CertifiedKey) -> eyre::Result<()> {
     let cert_err = match matched {
         // don't treat unknown consistency as an error
         Ok(()) | Err(rustls::Error::InconsistentKeys(rustls::InconsistentKeys::Unknown)) => {
-            return Ok(())
+            return Ok(());
         }
         Err(rustls::Error::InvalidCertificate(err)) => err,
         Err(err) => return Err(err.into()),

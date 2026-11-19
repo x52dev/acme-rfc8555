@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
+    Account,
     acc::AcmeKey,
     api,
     req::{req_expect_header, req_get, req_handle_error},
     trans::{NoncePool, Transport},
-    Account,
 };
 
 const LETSENCRYPT_URL: &str = "https://acme-v02.api.letsencrypt.org/directory";

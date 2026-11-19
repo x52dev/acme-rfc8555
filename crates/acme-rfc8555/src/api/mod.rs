@@ -5,8 +5,8 @@
 use std::fmt;
 
 use serde::{
-    ser::{SerializeMap as _, Serializer},
     Deserialize, Serialize,
+    ser::{SerializeMap as _, Serializer},
 };
 
 mod account;
