@@ -1,8 +1,11 @@
 [advisories]
+unused-ignored-advisory = "deny"
+
 ignore = [
   # h2 0.3 is pulled in by the Actix dev-dependencies, not the library.
   # Accept the risk for development and examples while Actix requires h2 0.3;
   # HTTP/2 servers built from the examples can still be affected.
   # Remove this ignore when Actix can use a patched h2 release.
   { id = "RUSTSEC-2026-0258", reason = "Temporary exception for h2 0.3 in Actix dev-dependencies; the advisory lists a fix in h2 >=0.4.16." },
+  { id = "RUSTSEC-2026-0594", reason = "Temporary exception while the workspace depends on cookie 0.16.2. The fix requires cookie 0.18.3 or later." },
 ]
